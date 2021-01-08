@@ -9,7 +9,7 @@
 #define CHECK(sts, msg) if ((sts)==-1) {perror(msg); exit(-1);}
 #define NBCLIENT 5
 #define MAX_BUFF	512
-#define PORT_SRV 15120
+#define PORT_SRV 15130
 #define ADDR_SRV "127.0.0.1"
 
 typedef char message_t[MAX_BUFF];
@@ -55,13 +55,7 @@ int sessionSrv(void) {
 
 int socketEcoute; /*socket écoute*/
 
-	struct sockaddr_in {
-  	uint8_t         sin_len;       /* longueur totale      */
-   	sa_family_t     sin_family;    /* famille : AF_INET     */
-   	in_port_t       sin_port;      /* le numéro de port    */
-   	struct in_addr  sin_addr;      /* l'adresse internet   */
-  	unsigned char   sin_zero[8];   /* un champ de 8 zéros  */
-	}seAdr;
+	struct sockaddr_in seAdr;
 
 	// Création d’une socket famille : INET mode de communication : STREAM
 	CHECK(socketEcoute = socket(PF_INET, SOCK_STREAM, 0),"-- PB : socket()");
