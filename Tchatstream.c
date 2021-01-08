@@ -106,13 +106,12 @@ void serveur (void)
 	//Attente de connexion d'un client
 	while (1)
 	{
-		// création d'une socket de dialogue
-		//socketDialogue=acceptClt(socketEcoute, &cltAdr);
+		//création d'une socket de dialogue
+		socketDialogue=acceptClt(socketEcoute, &cltAdr);
 		CHECK(pid=fork(), "PB-- fork()");
 		
 		// dialogue avec le client connecté
-		//dialSrv2Clt(socketDialogue, &cltAdr);
-
+		dialSrv2Clt(socketDialogue, &cltAdr);
 
 		// Fermeture de la socket de dialogue
 		CHECK(close(socketDialogue),"-- PB : close()");
@@ -127,7 +126,21 @@ void serveur (void)
 }
 
 
+int acceptClt(int socketEcoute, struct sockaddr_in *cltAdr)
+{
+	//Déclaration de socket de dialogue
+	int socketDialogue;
+	socklen_t lenCltAdr=sizeof(*cltAdr);
 
+	// Attente d'une connexion client : accept() côté serveur & connect côté client
+	printf("[SERVEUR]:Attente d'une connexion client\n");
+
+	//Le serveur accepte une connection (TCP) et alloue une socket de réponse.
+	CHECK(socketDialogue=accept(socketEcoute, (struct sockaddr *)cltAdr, &lenCltAdr),"-- PB : accept()");
+
+	printf("[SERVEUR]:Acceptation de connexion du client [%s:%d]\n", inet_ntoa(cltAdr->sin_addr), ntohs(cltAdr->sin_port));
+	return sd;
+}
 
 
 
