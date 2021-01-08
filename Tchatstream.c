@@ -1,5 +1,6 @@
 #include<stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -10,7 +11,15 @@
 #define PORT_SRV 15120
 #define ADDR_SRV "127.0.0.1"
 
+// Prototype
+void fermeture(void);
+void serveur (void);
+
+
+// Variable global
 int socketEcoute; /*socket écoute*/
+pid_t pid;
+
 
 int main () {
 
@@ -98,7 +107,7 @@ void serveur (void)
 	while (1)
 	{
 		// création d'une socket de dialogue
-		socketDialogue=acceptClt(socketEcoute, &cltAdr);
+		//socketDialogue=acceptClt(socketEcoute, &cltAdr);
 		CHECK(pid=fork(), "PB-- fork()");
 		
 		// dialogue avec le client connecté
@@ -112,7 +121,7 @@ void serveur (void)
 
 	}
 	// Fermeture de la socket de dialogue : intile pour le serveur
-	CHECK(close(sd),"-- PB : close()");		
+	CHECK(close(socketDialogue),"-- PB : close()");		
 
 	
 }
