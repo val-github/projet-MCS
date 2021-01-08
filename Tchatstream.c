@@ -1,4 +1,4 @@
-#include<stdio.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -8,8 +8,11 @@
 
 #define CHECK(sts, msg) if ((sts)==-1) {perror(msg); exit(-1);}
 #define NBCLIENT 5
+#define MAX_BUFF	512
 #define PORT_SRV 15120
 #define ADDR_SRV "127.0.0.1"
+
+typedef char message_t[MAX_BUFF];
 
 // Prototype
 void fermeture(void);
@@ -125,6 +128,8 @@ void serveur (void)
 	
 }
 
+///////////////////////////////////////////////////////////////////////////////
+//partie client
 
 int acceptClt(int socketEcoute, struct sockaddr_in *cltAdr)
 {
@@ -154,13 +159,11 @@ void dialClt2Srv(int sad) {
     char MSG = NULL;
     
     while (MSG != "stop"){
-            //lecture du message ecrit par le client
+        //lecture du message ecrit par le client
         MSG = getchar();
 
 	    // Dialogue du client avec le serveur : while(..) { envoiRequete(); attenteReponse();}
-	    // Ici on va se contenter d'envoyer un message et de recevoir une réponse	
-	    // Envoi d'un message à un destinaire avec \0
-	    printf("\t[CLIENT]:Envoi d'une requête sur [%d]\n", sad);
+	    printf("\t[CLIENT]:Envoi du message sur [%d]\n", sad);
 	    CHECK(send(sad, MSG, strlen(MSG)+1, 0),"-- PB : send()");
 	    printf("\t\t[CLIENT]:requête envoyée : ##%s##\n", MSG);
 
@@ -174,9 +177,15 @@ void dialClt2Srv(int sad) {
 
 	    // Attente d'une réponse
 	    memset(buff, 0, MAX_BUFF);
-	    CHECK(recv(sad, buff, MAX_BUFF, 0),"-- PB : recv()");
+	    CHECK(recv(sad, buff, MAX_BUFF, 0),"-pb reception message serveur");
 	    printf("\t[CLIENT]:Réception d'une réponse sur [%d]\n", sad);
 	    printf("\t\t[CLIENT]:Réponse reçue : ##%s##\n", buff);
+
+        //test d'arret de la discussion
+        if (buff == "stop"){
+            printf("fin de la discussion");
+            break;
+        }
     }
 
 }
