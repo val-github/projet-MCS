@@ -1,5 +1,9 @@
 #include<stdio.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #define CHECK(sts, msg) if ((sts)==-1) {perror(msg); exit(-1);}
 #define NBCLIENT 5
@@ -35,6 +39,7 @@ void fermeture(void)
 
 int sessionSrv(void) {
 
+int socketEcoute; /*socket écoute*/
 
 	struct sockaddr_in {
   	uint8_t         sin_len;       /* longueur totale      */
@@ -78,21 +83,40 @@ ntoh() == NETWORK TO HOST ( NETWORK parce que ca vient d'autre part que de MA ma
 
 }
 
-void serveur (void) {
+void serveur (void)
+{
+	//Déclaration de socket d'écoute et dialogue
+	int socketEcoute,socketDialogue;
 
-	// Mettre en place une socket d'écoute prête à la réception des connexions	
+	struct sockaddr_in cltAdr;
+
+
+	// Mise en place d'une socket d'écoute prête à la réception des connexions	
 	socketEcoute = sessionSrv();
+
+	//Attente de connexion d'un client
 	while (1)
 	{
-		pause();
+		// création d'une socket de dialogue
+		socketDialogue=acceptClt(socketEcoute, &cltAdr);
+		CHECK(pid=fork(), "PB-- fork()");
+		
+		// dialogue avec le client connecté
+		dialSrv2Clt(sd, &cltAdr);
+
+
+		// Fermeture de la socket de dialogue
+		CHECK(close(sd),"-- PB : close()");
+		exit(0);
+		
+
 	}
-		// Fermeture de la socket de dialogue : intile pour le serveur
-		CHECK(close(sd),"-- PB : close()");		
-	} 
+	// Fermeture de la socket de dialogue : intile pour le serveur
+	CHECK(close(sd),"-- PB : close()");		
+
 	
 }
 
-#include<stdio.h>
 
 
 
