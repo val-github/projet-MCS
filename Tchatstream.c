@@ -1,9 +1,10 @@
 #include<stdio.h>
+#include <string.h>
 
 #define CHECK(sts, msg) if ((sts)==-1) {perror(msg); exit(-1);}
-
-#define PORT_SRV	15120
-#define ADDR_SRV	"127.0.0.1"
+#define NBCLIENT 5
+#define PORT_SRV 15120
+#define ADDR_SRV "127.0.0.1"
 
 int socketEcoute; /*socket écoute*/
 
@@ -32,29 +33,63 @@ void fermeture(void)
 }
 
 
+int sessionSrv(void) {
+
+
+	struct sockaddr_in {
+  	uint8_t         sin_len;       /* longueur totale      */
+   	sa_family_t     sin_family;    /* famille : AF_INET     */
+   	in_port_t       sin_port;      /* le numéro de port    */
+   	struct in_addr  sin_addr;      /* l'adresse internet   */
+  	unsigned char   sin_zero[8];   /* un champ de 8 zéros  */
+	}seAdr;
+
+	// Création d’une socket famille : INET mode de communication : STREAM
+	CHECK(socketEcoute = socket(PF_INET, SOCK_STREAM, 0),"-- PB : socket()");
+	printf("[SERVEUR]:Création de la socket d'écoute [%d]\n", socketEcoute);
+
+	// Préparation d’un adressage pour une socket INET
+	seAdr.sin_family = PF_INET;
+	seAdr.sin_port = htons(PORT_SRV);				// htons() : network order	
+	seAdr.sin_addr.s_addr = inet_addr(ADDR_SRV);	// adresse effectiveS
+	memset(&(seAdr.sin_zero), 0, 8); // Cette fonction permet de remplir une zone mémoire, identifiée par son adresse et sa taille, avec une valeur précise.
+
+
+	// Association de la socket d'écoute avec l’adresse d'écoute
+	CHECK(bind(socketEcoute, (struct sockaddr *)&seAdr, sizeof(seAdr)),"-- PB : bind()");
+
+/*
+inet_aton() convertit l'adresse Internet de l'hôte cp depuis la notation IPv4 décimale pointée vers une forme binaire (dans l'ordre d'octet du réseau), et la stocke dans la structure pointée par inp.
+htol() === HOST TO LONG ( HOST parce que ca vient de MA machine ). Et si mon programme m'a envoi un type plus grand qu'un char
+ntoh() == NETWORK TO HOST ( NETWORK parce que ca vient d'autre part que de MA machine ).
+*/
+
+	printf("[SERVEUR]:Association de la socket [%d] avec l'adresse [%s:%d]\n", socketEcoute, inet_ntoa(seAdr.sin_addr), ntohs(seAdr.sin_port));
+
+
+	// Mise de la socket à l'écoute
+	CHECK(listen(socketEcoute, NBCLIENT), "--PB : listen()"); // Cette fonction définit la taille de la file de connexions en attente pour votre socket .
+	
+
+// Boucle permanente (1 serveur est un daemon)
+	printf("[SERVEUR]:Ecoute de demande de connexion (%d max) sur le canal [%d] d'adresse [%s:%d]\n", NBCLIENT, socketEcoute, inet_ntoa(seAdr.sin_addr), ntohs(seAdr.sin_port));
+	return socketEcoute;
+
+
+}
+
 void serveur (void) {
-	int socketEcoute, socketDialogue /*socket dialogue*/;
-	struct sockaddr_in cltAdr;
 
 	// Mettre en place une socket d'écoute prête à la réception des connexions	
-	se = sessionSrv();
-	while (1) {
-		// attente de connexion d'un client et création d'une socket de dialogue
-		sd=acceptClt(se, &cltAdr);
-		CHECK(pid=fork(), "PB-- fork()");
-		if (pid == 0) {
-			CHECK(close(se),"-- PB : close()"); // inutile pour le dialogue	
-			// dialogue avec le client connecté
-			dialSrv2Clt(sd, &cltAdr);
-			// Fermeture de la socket de dialogue
-			CHECK(close(sd),"-- PB : close()");
-			exit(0);
-		}
+	socketEcoute = sessionSrv();
+	while (1)
+	{
+		pause();
+	}
 		// Fermeture de la socket de dialogue : intile pour le serveur
 		CHECK(close(sd),"-- PB : close()");		
 	} 
-	// Fermeture de socket
-	CHECK(close(se),"-- PB : close()");
+	
 }
 
 #include<stdio.h>
