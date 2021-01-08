@@ -101,31 +101,48 @@ void serveur (void) {
 
 
 
-void dialClt2Srv(int sad, const char * MSG) {
+void dialClt2Srv(int sad) {
 	struct sockaddr_in sadAdr;
 	socklen_t lenSadAdr;
 	message_t buff;
+    char MSG = NULL;
+    
+    while (MSG != "stop"){
+            //lecture du message ecrit par le client
+        MSG = getchar();
 
-	// Dialogue du client avec le serveur : while(..) { envoiRequete(); attenteReponse();}
-	// Ici on va se contenter d'envoyer un message et de recevoir une réponse	
-	// Envoi d'un message à un destinaire avec \0
-	printf("\t[CLIENT]:Envoi d'une requête sur [%d]\n", sad);
-	CHECK(send(sad, MSG, strlen(MSG)+1, 0),"-- PB : send()");
-	printf("\t\t[CLIENT]:requête envoyée : ##%s##\n", MSG);
+	    // Dialogue du client avec le serveur : while(..) { envoiRequete(); attenteReponse();}
+	    // Ici on va se contenter d'envoyer un message et de recevoir une réponse	
+	    // Envoi d'un message à un destinaire avec \0
+	    printf("\t[CLIENT]:Envoi d'une requête sur [%d]\n", sad);
+	    CHECK(send(sad, MSG, strlen(MSG)+1, 0),"-- PB : send()");
+	    printf("\t\t[CLIENT]:requête envoyée : ##%s##\n", MSG);
 
-	// La socket client n'a pas éte bindée càd non adressée
-	// l'appel send a réalisé un bind (OS) : càd attribuer une adresse à la socket dyn
-	// getsockname permet de lire l'adressage de la socket
-	lenSadAdr = sizeof(sadAdr);
-	CHECK(getsockname(sad, (struct sockaddr *)&sadAdr, &lenSadAdr),"-- PB : bind()");
-	printf("\t\t[CLIENT]: avec l'adresse [%s:%d]\n",
-				inet_ntoa(sadAdr.sin_addr), ntohs(sadAdr.sin_port));
+	    // La socket client n'a pas éte bindée càd non adressée
+	    // l'appel send a réalisé un bind (OS) : càd attribuer une adresse à la socket dyn
+	    // getsockname permet de lire l'adressage de la socket
+	    lenSadAdr = sizeof(sadAdr);
+	    CHECK(getsockname(sad, (struct sockaddr *)&sadAdr, &lenSadAdr),"-- PB : bind()");
+	    printf("\t\t[CLIENT]: avec l'adresse [%s:%d]\n",
+				    inet_ntoa(sadAdr.sin_addr), ntohs(sadAdr.sin_port));
 
-	// Attente d'une réponse
-	memset(buff, 0, MAX_BUFF);
-	CHECK(recv(sad, buff, MAX_BUFF, 0),"-- PB : recv()");
-	printf("\t[CLIENT]:Réception d'une réponse sur [%d]\n", sad);
-	printf("\t\t[CLIENT]:Réponse reçue : ##%s##\n", buff);
+	    // Attente d'une réponse
+	    memset(buff, 0, MAX_BUFF);
+	    CHECK(recv(sad, buff, MAX_BUFF, 0),"-- PB : recv()");
+	    printf("\t[CLIENT]:Réception d'une réponse sur [%d]\n", sad);
+	    printf("\t\t[CLIENT]:Réponse reçue : ##%s##\n", buff);
+    }
+
+}
+
+int sessionClt(void) {
+	int sad;
+	// Création d’une socket INET/STREAM d'appel et de dialogue
+	CHECK(sad = socket(PF_INET, SOCK_STREAM, 0),"-- PB : socket()");
+	printf("[CLIENT]:Création de la socket d'appel et de dialogue [%d]\n", sad);		
+	// Le client n'a pas besoin d'avoir une adresse mais il peut
+	// ICI, Pas de préparation ni d'association
+	return sad;
 }
 
 void connectSrv(int sad) {
@@ -143,7 +160,7 @@ void connectSrv(int sad) {
 				inet_ntoa(srvAdr.sin_addr), ntohs(srvAdr.sin_port), sad);	
 }
 
-void client (const char * MSG) {
+void client () {
 	int sad /*socket appel et dialogue*/;
 
 	// Mise en place du socket d'appel PF_INET/STREAM adressée ou non
@@ -155,7 +172,7 @@ void client (const char * MSG) {
 
 	// Dialogue du client avec le serveur
 	dialClt2Srv(sad, MSG);
-    
+
 	// Fermeture de la socket de dialogue
 	getchar();
 	CHECK(close(sad),"-- PB : close()");	
