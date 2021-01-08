@@ -8,9 +8,10 @@
 
 #define CHECK(sts, msg) if ((sts)==-1) {perror(msg); exit(-1);}
 #define NBCLIENT 5
-#define MAX_BUFF	512
+#define MAX_BUFF 512
 #define PORT_SRV 15130
 #define ADDR_SRV "127.0.0.1"
+#define MAX_CHAR 512
 
 typedef char message_t[MAX_BUFF];
 
@@ -19,7 +20,7 @@ void fermeture(void);
 void dialClt2Srv(int sad);
 void serveur (void);
 int acceptClt(int socketEcoute, struct sockaddr_in *cltAdr);
-
+void client ();
 
 // Variable global
 int socketEcoute; /*socket écoute*/
@@ -28,20 +29,19 @@ pid_t pid;
 
 int main () {
 
-atexit(fermeture);
+	atexit(fermeture);
 
-#ifdef SERVEUR
+	#ifdef SERVEUR
 	serveur();
-#endif
+	#endif
 
-#ifdef CLIENT
+	#ifdef CLIENT
 	client();
+	#endif
 
-#endif
+	printf("Fin de l'application\n");
 
-printf("Fin de l'application\n");
 return 0;
-
 }
 
 void fermeture(void)
@@ -149,11 +149,14 @@ void dialClt2Srv(int sad)
 	struct sockaddr_in sadAdr;
 	socklen_t lenSadAdr;
 	message_t buff;
-    char MSG = "NULL";
+	char MSG[MAX_CHAR] = "NULL";
     
-    while (MSG != "stop"){
+	while (MSG != "stop"){
         //lecture du message ecrit par le client
-        MSG = getchar();
+
+	fgets(MSG, MAX_CHAR, stdin);	
+	MSG[strlen(MSG)-1]='\0';
+
 
 	    // Dialogue du client avec le serveur : while(..) { envoiRequete(); attenteReponse();}
 	    printf("\t[CLIENT]:Envoi du message sur [%d]\n", sad);
