@@ -102,11 +102,11 @@ void serveur (void)
 		CHECK(pid=fork(), "PB-- fork()");
 		
 		// dialogue avec le client connecté
-		dialSrv2Clt(sd, &cltAdr);
+		//dialSrv2Clt(socketDialogue, &cltAdr);
 
 
 		// Fermeture de la socket de dialogue
-		CHECK(close(sd),"-- PB : close()");
+		CHECK(close(socketDialogue),"-- PB : close()");
 		exit(0);
 		
 
