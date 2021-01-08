@@ -16,7 +16,9 @@ typedef char message_t[MAX_BUFF];
 
 // Prototype
 void fermeture(void);
+void dialClt2Srv(int sad);
 void serveur (void);
+int acceptClt(int socketEcoute, struct sockaddr_in *cltAdr);
 
 
 // Variable global
@@ -95,7 +97,7 @@ ntoh() == NETWORK TO HOST ( NETWORK parce que ca vient d'autre part que de MA ma
 
 }
 
-void serveur (void)
+void serveur(void)
 {
 	//Déclaration de socket d'écoute et dialogue
 	int socketEcoute,socketDialogue;
@@ -114,7 +116,7 @@ void serveur (void)
 		CHECK(pid=fork(), "PB-- fork()");
 		
 		// dialogue avec le client connecté
-		dialSrv2Clt(socketDialogue, &cltAdr);
+		//dialSrv2Clt(socketDialogue, &cltAdr);
 
 		// Fermeture de la socket de dialogue
 		CHECK(close(socketDialogue),"-- PB : close()");
@@ -144,15 +146,12 @@ int acceptClt(int socketEcoute, struct sockaddr_in *cltAdr)
 	CHECK(socketDialogue=accept(socketEcoute, (struct sockaddr *)cltAdr, &lenCltAdr),"-- PB : accept()");
 
 	printf("[SERVEUR]:Acceptation de connexion du client [%s:%d]\n", inet_ntoa(cltAdr->sin_addr), ntohs(cltAdr->sin_port));
-	return sd;
+	return socketDialogue;
 }
 
 
-
-
-
-
-void dialClt2Srv(int sad) {
+void dialClt2Srv(int sad)
+{
 	struct sockaddr_in sadAdr;
 	socklen_t lenSadAdr;
 	message_t buff;
@@ -226,7 +225,7 @@ void client () {
 	connectSrv(sad);
 
 	// Dialogue du client avec le serveur
-	dialClt2Srv(sad, MSG);
+	dialClt2Srv(sad);
 
 	// Fermeture de la socket de dialogue
 	getchar();
