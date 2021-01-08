@@ -102,7 +102,7 @@ void dialClt2Srv(int sad) {
 	struct sockaddr_in sadAdr;
 	socklen_t lenSadAdr;
 	message_t buff;
-    char MSG = NULL;
+    char MSG = "NULL";
     
     while (MSG != "stop"){
         //lecture du message ecrit par le client
@@ -110,7 +110,7 @@ void dialClt2Srv(int sad) {
 
 	    // Dialogue du client avec le serveur : while(..) { envoiRequete(); attenteReponse();}
 	    printf("\t[CLIENT]:Envoi du message sur [%d]\n", sad);
-	    CHECK(send(sad, MSG, strlen(MSG)+1, 0),"-- PB : send()");
+	    CHECK(send(sad, MSG, strlen(MSG)+1, 0),"-pb d envois du message");
 	    printf("\t\t[CLIENT]:requête envoyée : ##%s##\n", MSG);
 
 	    // La socket client n'a pas éte bindée càd non adressée
@@ -172,7 +172,7 @@ void client () {
 	connectSrv(sad);
 
 	// Dialogue du client avec le serveur
-	dialClt2Srv(sad, MSG);
+	dialClt2Srv(sad);
 
 	// Fermeture de la socket de dialogue
 	getchar();
