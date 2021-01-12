@@ -122,10 +122,14 @@ int PortClient = 15120;
 
 
 // lire pseudo + IP CLIENT + PORT CLIENT
-void lireFichierEnregistrement()
+void decoupeLire()
 {
 	int caractereActuel = 0;
-	 char chaine[26] = "";
+	char chaine[MAX_CHAR] = "";
+	char *resultat = NULL;
+	char *PseudoClient = NULL;
+	char * IpClient = NULL;
+	char * PortClient = NULL;
 	int compteur = 0;
 	FILE* fichier = NULL;
 	fichier = fopen(NOM_FICHIER,"r");
@@ -155,6 +159,31 @@ void lireFichierEnregistrement()
 		printf("fgets %s \n",chaine);	
 		fclose(fic);
 	}
+
+
+	PseudoClient = strtok(chaine,":");
+	printf("%s\n", PseudoClient);
+	if (PseudoClient != NULL)
+	{
+		IpClient = strtok(NULL,":");
+		printf("%s\n", IpClient);
+	
+		if (PseudoClient != NULL)
+		{
+			PortClient = strtok(NULL,":");
+			printf("%s\n", PortClient);
+			
+
+			
+		}
+
+	}
+	else
+	{
+		printf("erreur Decoupage");
+	}
+   
+
 }
 
 		
@@ -168,8 +197,13 @@ void serveur(void)
 	//Déclaration de socket d'écoute et dialogue
 	int socketEcoute,socketDialogue;
 	//ecrireFichierEnregistrement();
+<<<<<<< HEAD
 	lireFichierEnregistrement();
 	printf("fin de lecture\n");
+=======
+	decoupeLire();
+printf("fin de lecture\n");
+>>>>>>> main
 	struct sockaddr_in cltAdr;
 
 
