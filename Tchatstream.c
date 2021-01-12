@@ -2,9 +2,13 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <netdb.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <string.h>
 
 #define CHECK(sts, msg) if ((sts)==-1) {perror(msg); exit(-1);}
 #define NBCLIENT 5
@@ -93,6 +97,7 @@ ntoh() == NETWORK TO HOST ( NETWORK parce que ca vient d'autre part que de MA ma
 
 void serveur(void)
 {
+	printf("début serveur");
 	//Déclaration de socket d'écoute et dialogue
 	int socketEcoute,socketDialogue;
 
@@ -110,7 +115,7 @@ void serveur(void)
 		CHECK(pid=fork(), "PB-- fork()");
 		
 		// dialogue avec le client connecté
-		//dialSrv2Clt(socketDialogue, &cltAdr);
+		dialSrv2Clt(socketDialogue, &cltAdr);
 
 		// Fermeture de la socket de dialogue
 		CHECK(close(socketDialogue),"-- PB : close()");
@@ -122,6 +127,51 @@ void serveur(void)
 	CHECK(close(socketDialogue),"-- PB : close()");		
 
 	
+}
+//envoyer le fichier
+void envoyer(char addr){
+	char *buffer;
+   	int sock, rc, i;
+   	struct sockaddr_in cliAddr, ServAddr;
+   	int taille = 100; 
+	FILE* fichier = NULL;
+	char chaine[MAX_CHAR] = "";
+	fichier = fopen("plop.txt", "r");
+
+	if (fichier != NULL)
+    {
+        while (fgets(chaine, MAX_CHAR, fichier) != NULL) // On lit le fichier tant qu'on ne reçoit pas d'erreur (NULL)
+        {
+    		printf("%s", chaine); // On affiche la chaîne qu'on vient de lire
+			//initialisation du buffer
+			buffer = (char *) malloc(sizeof(char) * taille);
+			buffer = "ça marche !!!!!!"; //message envoyé au serveur
+  
+			printf("les données ont été envoyées\n");
+ 
+   			//initialisation de la socket
+   			ServAddr.sin_family = AF_INET;
+   			ServAddr.sin_port = htons(REMOTE_SERVER_PORT);
+   			ServAddr.sin_addr.s_addr = inet_addr(addr);
+ 
+   			//création de la socket
+   			sock = socket(AF_INET,SOCK_DGRAM,0);
+    
+   			//initialisation de la socket
+   			cliAddr.sin_family = AF_INET;
+   			cliAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+   			cliAddr.sin_port = htons(0);
+    
+   			rc = bind(sock, (struct sockaddr *) &cliAddr, sizeof(cliAddr)); //bind
+
+   			//envoi du message
+   			printf("envoi du fichier\n");
+   			rc=sendto(sock ,chaine, taille, 0, (struct sockaddr *)&ServAddr, sizeof(ServAddr));
+   
+        }
+    	fclose(fichier);
+    }
+	return 1;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -154,8 +204,8 @@ void dialClt2Srv(int sad)
 	while (MSG != "stop"){
         //lecture du message ecrit par le client
 
-	fgets(MSG, MAX_CHAR, stdin);	
-	MSG[strlen(MSG)-1]='\0';
+		fgets(MSG, MAX_CHAR, stdin);
+		MSG[strlen(MSG)-1]='\0';
 
 
 	    // Dialogue du client avec le serveur : while(..) { envoiRequete(); attenteReponse();}
