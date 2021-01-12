@@ -102,19 +102,20 @@ void ecrireFichierEnregistrement(char * IpClient, int PortClient)
 char * PseudoClient = "passage04";
 
 	FILE* fichier = NULL;
-	fichier = fopen(NOM_FICHIER,"r+");
+	fichier = fopen(NOM_FICHIER,"a");// test creer fic sinon r+
     
 	if ( fichier != NULL)
 	{
 		// on lit et on écrit dans le fichier
-		fprintf(fichier, "%s:%s:%d", PseudoClient, IpClient,PortClient);
+		fseek(fichier, 0, SEEK_END);
+		fprintf(fichier, "%s:%s:%d\n", PseudoClient, IpClient,PortClient);
+		rewind(fichier);
 		fclose(fichier);// on ferme le fichier qui a été ouvert
 	}
 	else
 	{
 		printf("Impossible d'ouvrir le fichier %s \n",NOM_FICHIER);
 	}
-//pb
 }
 
 // lire pseudo + IP CLIENT + PORT CLIENT
@@ -195,7 +196,6 @@ void serveur(void)
 	printf("fin de lecture\n");
 	struct sockaddr_in cltAdr;
 
-
 	// Mise en place d'une socket d'écoute prête à la réception des connexions	
 	socketEcoute = sessionSrv();
 
@@ -213,10 +213,10 @@ void serveur(void)
 		CHECK(close(socketDialogue),"-- PB : close()");
 		exit(0);
 		
-
 	}
 	// Fermeture de la socket de dialogue : intile pour le serveur
-	CHECK(close(socketDialogue),"-- PB : close()");		
+	//remove(NOM_FICHIER);// fichier clear quand serv se ferme
+	CHECK(close(socketEcoute),"-- PB : close()");		
 	
 }
 
@@ -237,7 +237,7 @@ void dialSrv2Clt(int sd, struct sockaddr_in *cltAdr) {
 	sscanf(buff,"%d",&req);
 
 	// si client demande le fichier on lui lit enregistrement puis on l'envoie
-CHECK(shutdown(socketDialogue, SHUT_WR),"-- PB : shutdown()");
+	CHECK(shutdown(socketDialogue, SHUT_WR),"-- PB : shutdown()");
 	sleep(1);
 }
 
