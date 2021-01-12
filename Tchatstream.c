@@ -22,6 +22,7 @@ typedef char message_t[MAX_BUFF];
 // Prototype
 void fermeture(void);
 void dialClt2Srv(int sad);
+void dialSrv2Clt(int sd, struct sockaddr_in *cltAdr);
 void serveur (void);
 int acceptClt(int socketEcoute, struct sockaddr_in *cltAdr);
 void client ();
@@ -96,11 +97,9 @@ ntoh() == NETWORK TO HOST ( NETWORK parce que ca vient d'autre part que de MA ma
 }
 
 // ecrire Pseudo + IP CLIENT + PORT CLIENT
-void ecrireFichierEnregistrement()
+void ecrireFichierEnregistrement(char * IpClient, int PortClient)
 {
 char * PseudoClient = "passage04";
-char * IpClient = "127.0.0.1";
-int PortClient = 15120;
 
 	FILE* fichier = NULL;
 	fichier = fopen(NOM_FICHIER,"r+");
@@ -115,21 +114,16 @@ int PortClient = 15120;
 	{
 		printf("Impossible d'ouvrir le fichier %s \n",NOM_FICHIER);
 	}
+//pb
 }
 
 
 
-
-
-// lire pseudo + IP CLIENT + PORT CLIENT
-void decoupeLire()
+// lire le fichier d'enregistrement pour le mettre dans une chaine
+void lireEnregistremenet()
 {
 	int caractereActuel = 0;
 	char chaine[MAX_CHAR] = "";
-	char *resultat = NULL;
-	char *PseudoClient = NULL;
-	char * IpClient = NULL;
-	char * PortClient = NULL;
 	int compteur = 0;
 	FILE* fichier = NULL;
 	fichier = fopen(NOM_FICHIER,"r");
@@ -158,8 +152,18 @@ void decoupeLire()
  		fgets(chaine,compteur-1,fic);
 		printf("fgets %s \n",chaine);	
 		fclose(fic);
-	}
+	} 
+ 
 
+}
+
+// découpe une chaine en pseudo + IP CLIENT + PORT CLIENT
+void decoupeLire(char * chaine)
+{
+	
+	char *PseudoClient = NULL;
+	char * IpClient = NULL;
+	char * PortClient = NULL;
 
 	PseudoClient = strtok(chaine,":");
 	printf("%s\n", PseudoClient);
@@ -173,37 +177,22 @@ void decoupeLire()
 			PortClient = strtok(NULL,":");
 			printf("%s\n", PortClient);
 			
-
-			
 		}
-
 	}
 	else
 	{
 		printf("erreur Decoupage");
 	}
    
-
 }
-
-		
-// ecrire Pseudo + IP CLIENT + PORT CLIENT
-// fichier clear quand serv se ferme
-
 
 void serveur(void)
 {
+
 	printf("début serveur");
 	//Déclaration de socket d'écoute et dialogue
 	int socketEcoute,socketDialogue;
-	//ecrireFichierEnregistrement();
-<<<<<<< HEAD
-	lireFichierEnregistrement();
-	printf("fin de lecture\n");
-=======
-	decoupeLire();
-printf("fin de lecture\n");
->>>>>>> main
+
 	struct sockaddr_in cltAdr;
 
 
@@ -229,59 +218,12 @@ printf("fin de lecture\n");
 	// Fermeture de la socket de dialogue : intile pour le serveur
 	CHECK(close(socketDialogue),"-- PB : close()");		
 
+// fichier clear quand serv se ferme
 	
 }
 
-//envoyer le fichier
-void envoyer(char addr){
-	char *buffer;
-   	int sock, rc, i;
-   	struct sockaddr_in cliAddr, ServAddr;
-   	int taille = 1; 
-	FILE* fichier = NULL;
-	char chaine[MAX_CHAR] = "";
-	fichier = fopen("plop.txt", "r");
 
-	if (fichier != NULL)
-    {
-		//initialisation de la socket
-   		ServAddr.sin_family = AF_INET;
-   		ServAddr.sin_port = htons(REMOTE_SERVER_PORT);
-   		ServAddr.sin_addr.s_addr = inet_addr(addr);
- 
-   		//création de la socket
-   		sock = socket(AF_INET,SOCK_DGRAM,0);
-    
-   		//initialisation de la socket
-   		cliAddr.sin_family = AF_INET;
-   		cliAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-   		cliAddr.sin_port = htons(0);
-
-        while (fgets(chaine, MAX_CHAR, fichier) != NULL) // On lit le fichier tant qu'on ne reçoit pas d'erreur (NULL)
-        {
-    		printf("%s", chaine); // On affiche la chaîne qu'on vient de lire
-			//initialisation du buffer
-			buffer = (char *) malloc(sizeof(char) * taille);
-			buffer = "ça marche !!!!!!"; //message envoyé au serveur
-  
-			printf("les données ont été envoyées\n");
- 
-   			
-    
-   			rc = bind(sock, (struct sockaddr *) &cliAddr, sizeof(cliAddr)); //bind
-
-   			//envoi du message
-   			printf("envoi du fichier\n");
-   			rc=sendto(sock ,chaine, taille, 0, (struct sockaddr *)&ServAddr, sizeof(ServAddr));
-   
-        }
-    	fclose(fichier);
-    }
-	return 1;
-}
-
-
-void dialSrv2Clt(int sd, struct sockaddr_in *cltAdr) {
+void dialSrv2Clt(int socketDialogue, struct sockaddr_in *cltAdr) {
 	// Dialogue avec le client
 	// Ici, lecture d'une requête et envoi du fichier
 	message_t buff;
@@ -289,7 +231,7 @@ void dialSrv2Clt(int sd, struct sockaddr_in *cltAdr) {
 
 	memset(buff, 0, MAX_BUFF);
 	printf("\t[SERVER]:Attente de réception d'une requête\n");
-	CHECK (recv(sd, buff, MAX_BUFF, 0), "PB-- recv()");
+	CHECK (recv(socketDialogue, buff, MAX_BUFF, 0), "PB-- recv()");
 
 
 	printf("\t[SERVER]:Requête reçue : ##%s##\n", buff);
@@ -297,19 +239,9 @@ void dialSrv2Clt(int sd, struct sockaddr_in *cltAdr) {
 			inet_ntoa(cltAdr->sin_addr), ntohs(cltAdr->sin_port));
 	sscanf(buff,"%d",&req);
 
-	/*if (req==1) {
-		printf("\t[SERVER]:Envoi d'une réponse sur [%d]\n", sd);
-		CHECK(send(sd, REPONSE1, strlen(REPONSE1)+1, 0),"-- PB : send()");
-		printf("\t\t[SERVER]:réponse envoyée : ##%s##\n", REPONSE1);
-	}
-	else {
-		printf("\t[SERVER]:Envoi d'une réponse sur [%d]\n", sd);
-		CHECK(send(sd, REPONSE2, strlen(REPONSE2)+1, 0),"-- PB : send()");
-		printf("\t\t[SERVER]:réponse envoyée : ##%s##\n", REPONSE2);
-	}
-	CHECK(shutdown(sd, SHUT_WR),"-- PB : shutdown()");
+	// si client demande le fichier on lui lit enregistrement puis on l'envoie
+CHECK(shutdown(socketDialogue, SHUT_WR),"-- PB : shutdown()");
 	sleep(1);
-	// utiliser les getsockopts pour déterminer si le client a envoyé qq chose */
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -328,6 +260,11 @@ int acceptClt(int socketEcoute, struct sockaddr_in *cltAdr)
 	CHECK(socketDialogue=accept(socketEcoute, (struct sockaddr *)cltAdr, &lenCltAdr),"-- PB : accept()");
 
 	printf("[SERVEUR]:Acceptation de connexion du client [%s:%d]\n", inet_ntoa(cltAdr->sin_addr), ntohs(cltAdr->sin_port));
+
+	// on enregistre l'arrivé du client
+	ecrireFichierEnregistrement(inet_ntoa(cltAdr->sin_addr), ntohs(cltAdr->sin_port));
+
+
 	return socketDialogue;
 }
 
