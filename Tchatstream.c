@@ -169,7 +169,7 @@ void serveur(void)
 	int socketEcoute,socketDialogue;
 	//ecrireFichierEnregistrement();
 	lireFichierEnregistrement();
-printf("fin de lecture\n");
+	printf("fin de lecture\n");
 	struct sockaddr_in cltAdr;
 
 
@@ -197,18 +197,32 @@ printf("fin de lecture\n");
 
 	
 }
+
 //envoyer le fichier
 void envoyer(char addr){
 	char *buffer;
    	int sock, rc, i;
    	struct sockaddr_in cliAddr, ServAddr;
-   	int taille = 100; 
+   	int taille = 1; 
 	FILE* fichier = NULL;
 	char chaine[MAX_CHAR] = "";
 	fichier = fopen("plop.txt", "r");
 
 	if (fichier != NULL)
     {
+		//initialisation de la socket
+   		ServAddr.sin_family = AF_INET;
+   		ServAddr.sin_port = htons(REMOTE_SERVER_PORT);
+   		ServAddr.sin_addr.s_addr = inet_addr(addr);
+ 
+   		//création de la socket
+   		sock = socket(AF_INET,SOCK_DGRAM,0);
+    
+   		//initialisation de la socket
+   		cliAddr.sin_family = AF_INET;
+   		cliAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+   		cliAddr.sin_port = htons(0);
+
         while (fgets(chaine, MAX_CHAR, fichier) != NULL) // On lit le fichier tant qu'on ne reçoit pas d'erreur (NULL)
         {
     		printf("%s", chaine); // On affiche la chaîne qu'on vient de lire
@@ -218,18 +232,7 @@ void envoyer(char addr){
   
 			printf("les données ont été envoyées\n");
  
-   			//initialisation de la socket
-   			ServAddr.sin_family = AF_INET;
-   			ServAddr.sin_port = htons(REMOTE_SERVER_PORT);
-   			ServAddr.sin_addr.s_addr = inet_addr(addr);
- 
-   			//création de la socket
-   			sock = socket(AF_INET,SOCK_DGRAM,0);
-    
-   			//initialisation de la socket
-   			cliAddr.sin_family = AF_INET;
-   			cliAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-   			cliAddr.sin_port = htons(0);
+   			
     
    			rc = bind(sock, (struct sockaddr *) &cliAddr, sizeof(cliAddr)); //bind
 
