@@ -12,7 +12,7 @@
 #define PORT_SRV 15130
 #define ADDR_SRV "127.0.0.1"
 #define MAX_CHAR 512
-
+#define NOM_FICHIER "enregistrement.txt"
 typedef char message_t[MAX_BUFF];
 
 // Prototype
@@ -91,11 +91,80 @@ ntoh() == NETWORK TO HOST ( NETWORK parce que ca vient d'autre part que de MA ma
 
 }
 
+// ecrire Pseudo + IP CLIENT + PORT CLIENT
+void ecrireFichierEnregistrement()
+{
+char * PseudoClient = "passage04";
+char * IpClient = "127.0.0.1";
+int PortClient = 15120;
+
+	FILE* fichier = NULL;
+	fichier = fopen(NOM_FICHIER,"r+");
+    
+	if ( fichier != NULL)
+	{
+		// on lit et on écrit dans le fichier
+		fprintf(fichier, "%s:%s:%d", PseudoClient, IpClient,PortClient);
+		fclose(fichier);// on ferme le fichier qui a été ouvert
+	}
+	else
+	{
+		printf("Impossible d'ouvrir le fichier %s \n",NOM_FICHIER);
+	}
+}
+
+
+
+
+
+// lire pseudo + IP CLIENT + PORT CLIENT
+void lireFichierEnregistrement()
+{
+	int caractereActuel = 0;
+	 char chaine[26] = "";
+	int compteur = 0;
+	FILE* fichier = NULL;
+	fichier = fopen(NOM_FICHIER,"r");
+    
+	if (fichier != NULL)
+	{
+		// on lit caractères par caractère
+		 while (!feof(fichier)) // Jusqu'a fin fichier
+		{
+			fgetc(fichier);
+			compteur ++;	
+		}
+		printf("compteur %d \n",compteur);		
+		fclose(fichier);// on ferme le fichier qui a été ouvert
+	}
+	else
+	{
+		printf("Impossible d'ouvrir le fichier %s \n",NOM_FICHIER);
+	}
+
+
+	FILE* fic = NULL;
+	fic = fopen(NOM_FICHIER,"r");
+	if (fic != NULL)
+	{
+ 		fgets(chaine,compteur-1,fic);
+		printf("fgets %s \n",chaine);	
+		fclose(fic);
+	}
+}
+
+		
+// ecrire Pseudo + IP CLIENT + PORT CLIENT
+// fichier clear quand serv se ferme
+
+
 void serveur(void)
 {
 	//Déclaration de socket d'écoute et dialogue
 	int socketEcoute,socketDialogue;
-
+	//ecrireFichierEnregistrement();
+	lireFichierEnregistrement();
+printf("fin de lecture\n");
 	struct sockaddr_in cltAdr;
 
 
@@ -122,6 +191,38 @@ void serveur(void)
 	CHECK(close(socketDialogue),"-- PB : close()");		
 
 	
+}
+
+
+void dialSrv2Clt(int sd, struct sockaddr_in *cltAdr) {
+	// Dialogue avec le client
+	// Ici, lecture d'une requête et envoi du fichier
+	message_t buff;
+	int req;	
+
+	memset(buff, 0, MAX_BUFF);
+	printf("\t[SERVER]:Attente de réception d'une requête\n");
+	CHECK (recv(sd, buff, MAX_BUFF, 0), "PB-- recv()");
+
+
+	printf("\t[SERVER]:Requête reçue : ##%s##\n", buff);
+	printf("\t\t[SERVER]:du client d'adresse [%s:%d]\n",
+			inet_ntoa(cltAdr->sin_addr), ntohs(cltAdr->sin_port));
+	sscanf(buff,"%d",&req);
+
+	/*if (req==1) {
+		printf("\t[SERVER]:Envoi d'une réponse sur [%d]\n", sd);
+		CHECK(send(sd, REPONSE1, strlen(REPONSE1)+1, 0),"-- PB : send()");
+		printf("\t\t[SERVER]:réponse envoyée : ##%s##\n", REPONSE1);
+	}
+	else {
+		printf("\t[SERVER]:Envoi d'une réponse sur [%d]\n", sd);
+		CHECK(send(sd, REPONSE2, strlen(REPONSE2)+1, 0),"-- PB : send()");
+		printf("\t\t[SERVER]:réponse envoyée : ##%s##\n", REPONSE2);
+	}
+	CHECK(shutdown(sd, SHUT_WR),"-- PB : shutdown()");
+	sleep(1);
+	// utiliser les getsockopts pour déterminer si le client a envoyé qq chose */
 }
 
 ///////////////////////////////////////////////////////////////////////////////
