@@ -117,10 +117,8 @@ char * PseudoClient = "passage04";
 //pb
 }
 
-
-
-// lire le fichier d'enregistrement pour le mettre dans une chaine
-void lireEnregistremenet()
+// lire pseudo + IP CLIENT + PORT CLIENT
+char lireEnregistrement()
 {
 	int caractereActuel = 0;
 	char chaine[MAX_CHAR] = "";
@@ -133,8 +131,8 @@ void lireEnregistremenet()
 		// on lit caractères par caractère
 		 while (!feof(fichier)) // Jusqu'a fin fichier
 		{
-			fgetc(fichier);
-			compteur ++;	
+			//chaine.add(fgetc(fichier));
+			compteur ++;
 		}
 		printf("compteur %d \n",compteur);		
 		fclose(fichier);// on ferme le fichier qui a été ouvert
@@ -153,11 +151,11 @@ void lireEnregistremenet()
 		printf("fgets %s \n",chaine);	
 		fclose(fic);
 	} 
- 
+	return chaine;
 
 }
 
-// découpe une chaine en pseudo + IP CLIENT + PORT CLIENT
+// lire pseudo + IP CLIENT + PORT CLIENT
 void decoupeLire(char * chaine)
 {
 	
@@ -176,7 +174,6 @@ void decoupeLire(char * chaine)
 		{
 			PortClient = strtok(NULL,":");
 			printf("%s\n", PortClient);
-			
 		}
 	}
 	else
@@ -192,7 +189,10 @@ void serveur(void)
 	printf("début serveur");
 	//Déclaration de socket d'écoute et dialogue
 	int socketEcoute,socketDialogue;
-
+	//ecrireFichierEnregistrement();
+	char chaine = lireEnregistrement();
+	decoupeLire(chaine);
+	printf("fin de lecture\n");
 	struct sockaddr_in cltAdr;
 
 
@@ -217,13 +217,10 @@ void serveur(void)
 	}
 	// Fermeture de la socket de dialogue : intile pour le serveur
 	CHECK(close(socketDialogue),"-- PB : close()");		
-
-// fichier clear quand serv se ferme
 	
 }
 
-
-void dialSrv2Clt(int socketDialogue, struct sockaddr_in *cltAdr) {
+void dialSrv2Clt(int sd, struct sockaddr_in *cltAdr) {
 	// Dialogue avec le client
 	// Ici, lecture d'une requête et envoi du fichier
 	message_t buff;
@@ -336,7 +333,8 @@ void connectSrv(int sad) {
 				inet_ntoa(srvAdr.sin_addr), ntohs(srvAdr.sin_port), sad);	
 }
 
-void client () {
+void client() {
+	printf ("lancement client");
 	int sad /*socket appel et dialogue*/;
 
 	// Mise en place du socket d'appel PF_INET/STREAM adressée ou non
