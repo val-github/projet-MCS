@@ -61,7 +61,7 @@ void fermeture(void)
 
 int sessionSrv(void) {
 
-int socketEcoute; /*socket écoute*/
+int socketEcoute;
 
 	struct sockaddr_in seAdr;
 
@@ -71,7 +71,7 @@ int socketEcoute; /*socket écoute*/
 
 	// Préparation d’un adressage pour une socket INET
 	seAdr.sin_family = PF_INET;
-	seAdr.sin_port = htons(PORT_SRV);				// htons() : network order	
+	seAdr.sin_port = htons(PORT_SRV); // htons() : network order	
 	seAdr.sin_addr.s_addr = inet_addr(ADDR_SRV);	// adresse effectiveS
 	memset(&(seAdr.sin_zero), 0, 8); // Cette fonction permet de remplir une zone mémoire, identifiée par son adresse et sa taille, avec une valeur précise.
 
@@ -79,11 +79,6 @@ int socketEcoute; /*socket écoute*/
 	// Association de la socket d'écoute avec l’adresse d'écoute
 	CHECK(bind(socketEcoute, (struct sockaddr *)&seAdr, sizeof(seAdr)),"-- PB : bind()");
 
-/*
-inet_aton() convertit l'adresse Internet de l'hôte cp depuis la notation IPv4 décimale pointée vers une forme binaire (dans l'ordre d'octet du réseau), et la stocke dans la structure pointée par inp.
-htol() === HOST TO LONG ( HOST parce que ca vient de MA machine ). Et si mon programme m'a envoi un type plus grand qu'un char
-ntoh() == NETWORK TO HOST ( NETWORK parce que ca vient d'autre part que de MA machine ).
-*/
 
 	printf("[SERVEUR]:Association de la socket [%d] avec l'adresse [%s:%d]\n", socketEcoute, inet_ntoa(seAdr.sin_addr), ntohs(seAdr.sin_port));
 
@@ -105,7 +100,7 @@ void ecrireFichierEnregistrement(char * IpClient, int PortClient)
 char * PseudoClient = "passage04";
 
 	FILE* fichier = NULL;
-	fichier = fopen(NOM_FICHIER,"r+");
+	fichier = fopen(NOM_FICHIER,"r+");// test creer fic sinon r+
     
 	if ( fichier != NULL)
 	{
@@ -217,7 +212,8 @@ void serveur(void)
 
 	// Mise en place d'une socket d'écoute prête à la réception des connexions	
 	socketEcoute = sessionSrv();
-
+ 	
+	int I=0;
 	//Attente de connexion d'un client
 	for (int i = 0; i < NBCLIENT; i++)
 	{
@@ -236,8 +232,7 @@ void serveur(void)
 	CHECK(close(socketEcoute),"-- PB : close()");
 }
 
-
-char dialSrv2Clt(int sd, struct sockaddr_in *cltAdr) {
+void dialSrv2Clt(int socketDialogue, struct sockaddr_in *cltAdr) {
 	// Dialogue avec le client
 	// Ici, lecture d'une requête et envoi du fichier
 	message_t buff;
@@ -245,7 +240,7 @@ char dialSrv2Clt(int sd, struct sockaddr_in *cltAdr) {
 
 	memset(buff, 0, MAX_BUFF);
 	printf("\t[SERVER]:Attente de réception d'une requête\n");
-	CHECK (recv(sd, buff, MAX_BUFF, 0), "PB-- recv()");	
+	CHECK (recv(socketDialogue, buff, MAX_BUFF, 0), "PB-- recv()");
 
 	printf("\t[SERVER]:Requête reçue : ##%s##\n", buff);
 	printf("\t\t[SERVER]:du client d'adresse [%s:%d]\n",
