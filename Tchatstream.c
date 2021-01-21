@@ -9,15 +9,18 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <pthread.h>
 
 #define CHECK(sts, msg) if ((sts)==-1) {perror(msg); exit(-1);}
 #define NBCLIENT 5
 #define MAX_BUFF 512
 #define PORT_SRV 15130
-#define ADDR_SRV "127.0.0.1"
+#define ADDR_SRV "127.0.0.23"
 #define MAX_CHAR 512
 #define NOM_FICHIER "enregistrement.txt"
 typedef char message_t[MAX_BUFF];
+
+pthread_t tid[NBCLIENT];
 
 // Prototype
 void fermeture(void);
@@ -142,7 +145,6 @@ char lireEnregistrement()
 		printf("Impossible d'ouvrir le fichier %s \n",NOM_FICHIER);
 	}
 
-
 	FILE* fic = NULL;
 	fic = fopen(NOM_FICHIER,"r");
 	if (fic != NULL)
@@ -152,7 +154,6 @@ char lireEnregistrement()
 		fclose(fic);
 	} 
 	return chaine;
-
 }
 
 // lire pseudo + IP CLIENT + PORT CLIENT
@@ -183,52 +184,70 @@ void decoupeLire(char * chaine)
    
 }
 
-void serveur(void)
+//fonction des threads de dialogue
+void *ThreadDialogue (int socketEcoute)
 {
-
-	printf("début serveur");
-	//Déclaration de socket d'écoute et dialogue
-	int socketEcoute,socketDialogue;
-	//ecrireFichierEnregistrement();
-	char chaine = lireEnregistrement();
-	decoupeLire(chaine);
-	printf("fin de lecture\n");
 	struct sockaddr_in cltAdr;
-
-
-	// Mise en place d'une socket d'écoute prête à la réception des connexions	
-	socketEcoute = sessionSrv();
-
-	//Attente de connexion d'un client
-	while (1)
-	{
-		//création d'une socket de dialogue
-		socketDialogue=acceptClt(socketEcoute, &cltAdr);
+	int socketDialogue;
+	//création d'une socket de dialogue
+	socketDialogue=acceptClt(socketEcoute, &cltAdr);
+	while(1){
+		
 		CHECK(pid=fork(), "PB-- fork()");
 		
 		// dialogue avec le client connecté
 		dialSrv2Clt(socketDialogue, &cltAdr);
 
-		// Fermeture de la socket de dialogue
-		CHECK(close(socketDialogue),"-- PB : close()");
-		exit(0);
 		
-
+		
+		
 	}
-	// Fermeture de la socket de dialogue : intile pour le serveur
-	CHECK(close(socketDialogue),"-- PB : close()");		
+	// Fermeture de la socket de dialogue
+	CHECK(close(socketDialogue),"-- PB : close()");
 	
 }
+
+void serveur(void)
+{
+
+	printf("début serveur\n");
+	//Déclaration de socket d'écoute et dialogue
+	int socketEcoute;
+	//ecrireFichierEnregistrement();
+	//char chaine = lireEnregistrement();
+	//decoupeLire(chaine);
+
+	// Mise en place d'une socket d'écoute prête à la réception des connexions	
+	socketEcoute = sessionSrv();
+
+	//Attente de connexion d'un client
+	for (int i = 0; i < NBCLIENT; i++)
+	{
+		printf("creation thread + %d\n", i);
+		//création du thread qui gérera le dialogue avec le client
+		CHECK(pthread_create (&tid[i], NULL, ThreadDialogue, socketEcoute),
+                "pthread_create()");
+	}
+
+	for (int i = 0; i < NBCLIENT; i++)
+        CHECK(pthread_join (tid[i], NULL),"pthread_join()");
+    return EXIT_SUCCESS;
+
+	// Fermeture de la socket d'écoute : inutile pour le serveur
+	printf("fin de lecture\n");
+	CHECK(close(socketEcoute),"-- PB : close()");
+}
+
 
 void dialSrv2Clt(int sd, struct sockaddr_in *cltAdr) {
 	// Dialogue avec le client
 	// Ici, lecture d'une requête et envoi du fichier
 	message_t buff;
-	int req;	
+	int req;
 
 	memset(buff, 0, MAX_BUFF);
 	printf("\t[SERVER]:Attente de réception d'une requête\n");
-	CHECK (recv(socketDialogue, buff, MAX_BUFF, 0), "PB-- recv()");
+	CHECK (recv(sd, buff, MAX_BUFF, 0), "PB-- recv()");
 
 
 	printf("\t[SERVER]:Requête reçue : ##%s##\n", buff);
@@ -237,7 +256,7 @@ void dialSrv2Clt(int sd, struct sockaddr_in *cltAdr) {
 	sscanf(buff,"%d",&req);
 
 	// si client demande le fichier on lui lit enregistrement puis on l'envoie
-CHECK(shutdown(socketDialogue, SHUT_WR),"-- PB : shutdown()");
+	CHECK(shutdown(sd, SHUT_WR),"-- PB : shutdown()");
 	sleep(1);
 }
 
@@ -265,7 +284,6 @@ int acceptClt(int socketEcoute, struct sockaddr_in *cltAdr)
 	return socketDialogue;
 }
 
-
 void dialClt2Srv(int sad)
 {
 	struct sockaddr_in sadAdr;
@@ -278,7 +296,6 @@ void dialClt2Srv(int sad)
 
 		fgets(MSG, MAX_CHAR, stdin);
 		MSG[strlen(MSG)-1]='\0';
-
 
 	    // Dialogue du client avec le serveur : while(..) { envoiRequete(); attenteReponse();}
 	    printf("\t[CLIENT]:Envoi du message sur [%d]\n", sad);
@@ -305,7 +322,6 @@ void dialClt2Srv(int sad)
             break;
         }
     }
-
 }
 
 int sessionClt(void) {
