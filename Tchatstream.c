@@ -15,7 +15,7 @@
 #define NBCLIENT 5
 #define MAX_BUFF 512
 #define PORT_SRV 15130
-#define ADDR_SRV "127.0.0.23"
+#define ADDR_SRV "127.0.0.24"
 #define MAX_CHAR 512
 #define NOM_FICHIER "enregistrement.txt"
 typedef char message_t[MAX_BUFF];
@@ -25,7 +25,7 @@ pthread_t tid[NBCLIENT];
 // Prototype
 void fermeture(void);
 void dialClt2Srv(int sad);
-void dialSrv2Clt(int sd, struct sockaddr_in *cltAdr);
+char dialSrv2Clt(int sd, struct sockaddr_in *cltAdr);
 void serveur (void);
 int acceptClt(int socketEcoute, struct sockaddr_in *cltAdr);
 void client ();
@@ -105,20 +105,19 @@ void ecrireFichierEnregistrement(char * IpClient, int PortClient)
 char * PseudoClient = "passage04";
 
 	FILE* fichier = NULL;
-	fichier = fopen(NOM_FICHIER,"a");// test creer fic sinon r+
+	fichier = fopen(NOM_FICHIER,"r+");
     
 	if ( fichier != NULL)
 	{
 		// on lit et on écrit dans le fichier
-		fseek(fichier, 0, SEEK_END);
-		fprintf(fichier, "%s:%s:%d\n", PseudoClient, IpClient,PortClient);
-		rewind(fichier);
+		fprintf(fichier, "%s:%s:%d", PseudoClient, IpClient,PortClient);
 		fclose(fichier);// on ferme le fichier qui a été ouvert
 	}
 	else
 	{
 		printf("Impossible d'ouvrir le fichier %s \n",NOM_FICHIER);
 	}
+//pb
 }
 
 // lire pseudo + IP CLIENT + PORT CLIENT
@@ -190,18 +189,16 @@ void *ThreadDialogue (int socketEcoute)
 {
 	struct sockaddr_in cltAdr;
 	int socketDialogue;
+	char msg;
 	//création d'une socket de dialogue
 	socketDialogue=acceptClt(socketEcoute, &cltAdr);
-	while(1){
+	while(msg != "stop"){
 		
 		CHECK(pid=fork(), "PB-- fork()");
 		
 		// dialogue avec le client connecté
-		dialSrv2Clt(socketDialogue, &cltAdr);
+		msg = dialSrv2Clt(socketDialogue, &cltAdr);
 
-		
-		
-		
 	}
 	// Fermeture de la socket de dialogue
 	CHECK(close(socketDialogue),"-- PB : close()");
@@ -240,7 +237,7 @@ void serveur(void)
 }
 
 
-void dialSrv2Clt(int sd, struct sockaddr_in *cltAdr) {
+char dialSrv2Clt(int sd, struct sockaddr_in *cltAdr) {
 	// Dialogue avec le client
 	// Ici, lecture d'une requête et envoi du fichier
 	message_t buff;
@@ -248,8 +245,7 @@ void dialSrv2Clt(int sd, struct sockaddr_in *cltAdr) {
 
 	memset(buff, 0, MAX_BUFF);
 	printf("\t[SERVER]:Attente de réception d'une requête\n");
-	CHECK (recv(sd, buff, MAX_BUFF, 0), "PB-- recv()");
-
+	CHECK (recv(sd, buff, MAX_BUFF, 0), "PB-- recv()");	
 
 	printf("\t[SERVER]:Requête reçue : ##%s##\n", buff);
 	printf("\t\t[SERVER]:du client d'adresse [%s:%d]\n",
@@ -258,6 +254,7 @@ void dialSrv2Clt(int sd, struct sockaddr_in *cltAdr) {
 
 	// si client demande le fichier on lui lit enregistrement puis on l'envoie
 	CHECK(shutdown(sd, SHUT_WR),"-- PB : shutdown()");
+	return (buff);
 	sleep(1);
 }
 
