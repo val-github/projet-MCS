@@ -190,12 +190,12 @@ void *ThreadDialogue (int socketEcoute)
 	char msg;
 	//création d'une socket de dialogue
 	socketDialogue=acceptClt(socketEcoute, &cltAdr);
-	while(msg != "stop"){
+	while(msg != "true"){
 		
 		CHECK(pid=fork(), "PB-- fork()");
-		
-		// dialogue avec le client connecté
 		msg = dialSrv2Clt(socketDialogue, &cltAdr);
+		// dialogue avec le client connecté
+		
 
 
 
@@ -208,17 +208,17 @@ void *ThreadDialogue (int socketEcoute)
 // fonction qui gére l'envoi des messages à tout les clients
 // (récupére les infos des différents clients et leur transmet msg)
 void dialClt2Clt(char msg){
-	char[NBCLIENT] fichier; 
+	char fichier[NBCLIENT]; 
 	char pseudo, ip, port;
 	int i = 0;
 
-	fichier = lireEnregistrement();
+	//fichier = lireEnregistrement();
 	while (1){
 		if (decoupeLire(fichier[i]) == NULL){
-			break
+			break;
 		}
-		(pseudo, ip, port) = decoupeLire(fichier[i]);
-
+		//(pseudo, ip, port) = decoupeLire(fichier[i]);
+		struct sockaddr_in srvAdr;
 		int sad;
 		// Création d’une socket INET/STREAM d'appel et de dialogue
 		CHECK(sad = socket(PF_INET, SOCK_STREAM, 0),"-- PB : socket()");
@@ -269,7 +269,35 @@ void serveur(void)
 	CHECK(close(socketEcoute),"-- PB : close()");
 }
 
-void dialSrv2Clt(int socketDialogue, struct sockaddr_in *cltAdr) {
+
+long tailleChaine(const char truck[])
+{
+    long i=0;
+    while (truck[i]!='\0')
+    {
+        i++;
+    }
+    return i;
+}
+
+long comparer(const char truck1[], const char truck2[])
+{
+    long k=0;
+ 
+	if (tailleChaine(truck1) == tailleChaine(truck2))
+	{
+    for (k; k<tailleChaine(truck1) && k<tailleChaine(truck2); k++)
+    {
+        if (truck1[k] != truck2[k])
+            return 1;
+    }
+        return 0;
+	}
+return 1;
+}
+
+
+char dialSrv2Clt(int socketDialogue, struct sockaddr_in *cltAdr) {
 	// Dialogue avec le client
 	// Ici, lecture d'une requête et envoi du fichier
 	message_t buff;
@@ -282,12 +310,16 @@ void dialSrv2Clt(int socketDialogue, struct sockaddr_in *cltAdr) {
 	printf("\t[SERVER]:Requête reçue : ##%s##\n", buff);
 	printf("\t\t[SERVER]:du client d'adresse [%s:%d]\n",
 			inet_ntoa(cltAdr->sin_addr), ntohs(cltAdr->sin_port));
-	sscanf(buff,"%s",&req);
-	
-	return (req);
+	req = comparer(buff,"stop");
+	if (req == 0)
+	{
+		printf("BUT ALORS YOU ARE FRENCH !");
+		return "true";
+		
+	}
 	// si client demande le fichier on lui lit enregistrement puis on l'envoie
-	CHECK(shutdown(sd, SHUT_WR),"-- PB : shutdown()");
-	
+	CHECK(shutdown(socketDialogue, SHUT_WR),"-- PB : shutdown()");
+	return "false";
 	sleep(1);
 }
 
@@ -400,3 +432,4 @@ void client() {
 	getchar();
 	CHECK(close(sad),"-- PB : close()");	
 }
+
