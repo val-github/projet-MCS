@@ -16,7 +16,7 @@
 #define MAX_BUFF 512
 #define PORT_SRV 15130
 #define ADDR_SRV "127.0.0.24"
-#define MAX_CHAR 512
+#define MAX_CHAR 256
 #define NOM_FICHIER "enregistrement.txt"
 typedef char message_t[MAX_BUFF];
 
@@ -219,7 +219,7 @@ void lireEnregistrement(T_Client *clt)
 // lire pseudo + IP CLIENT + PORT CLIENT
 char* decoupeLire(char * chaine)
 {
-	
+	printf("debut decoupe lire");
 	char *PseudoClient = NULL;
 	char *IpClient = NULL;
 	char *PortClient = NULL;
@@ -239,7 +239,7 @@ char* decoupeLire(char * chaine)
 	}
 	else
 	{
-		printf("erreur Decoupage");
+		return NULL;
 	}
    return (PseudoClient, IpClient, PortClient);
 }
