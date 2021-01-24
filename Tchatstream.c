@@ -47,6 +47,10 @@ int main () {
 	client();
 	#endif
 
+	#ifdef FICHIER
+	lireEnregistrement();
+	#endif
+
 	printf("Fin de l'application\n");
 
 return 0;
@@ -217,9 +221,12 @@ void dialClt2Clt(char msg){
 		if (decoupeLire(fichier[i]) == NULL){
 			break;
 		}
-		//(pseudo, ip, port) = decoupeLire(fichier[i]);
-		struct sockaddr_in srvAdr;
+		pseudo = decoupeLire(fichier[i])[0];
+		ip = decoupeLire(fichier[i])[1];
+		port = decoupeLire(fichier[i])[2];
+
 		int sad;
+		struct sockaddr_in srvAdr;
 		// Création d’une socket INET/STREAM d'appel et de dialogue
 		CHECK(sad = socket(PF_INET, SOCK_STREAM, 0),"-- PB : socket()");
 		
