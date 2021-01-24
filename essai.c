@@ -14,36 +14,19 @@ typedef struct
 	char *  portClient;
 }T_Client;
 
-/*
-int nbLigne()
-{
-	int c, nbLigne = 0;
-	FILE* fichier = NULL;
-	fichier = fopen(NOM_FICHIER,"r");
-	if (fichier != NULL)
-	{
-		while((c=fgetc(fichier)) != EOF)
-		{
-			if(c=='\n')
-				nbLigne++;
-		}
-	
-	}
-return nbLigne;
-}*/
 
-void lireEnregistrement(T_Client *clt)
+void lireEnregistrement(T_Client *clt,int nbLigne)
 {
-	int caractereActuel = 0;
+	char caractereActuel;
 	char chaine [MAX_CHAR],str[MAX_CHAR];
-	int ligne =0;
+	int c,ligne =0;
 	int compteur = 0;
 	FILE* fichier = NULL;
 	fichier = fopen(NOM_FICHIER,"r");
     
 	if (fichier != NULL)
 	{
-		 while (!feof(fichier))
+		while (!feof(fichier))
 		{
 			fgetc(fichier);
 			compteur ++;
@@ -61,34 +44,34 @@ void lireEnregistrement(T_Client *clt)
 
 	if (fic != NULL)
 	{
-		while(ligne < 10)
+		while((c=fgetc(fichier)) != EOF)
 		{
-			caractereActuel = fgetc(fic);
-			if ( caractereActuel == "\n")
-			{
+			if(c=='\n')
 				ligne++;
-			}
-		}
-
-			fgets(chaine,compteur,fic);
-			printf("fgets %s \n",chaine);
-			clt->pseudo = strtok(chaine,":");
-			printf("%s\n", clt->pseudo);
-			if (clt->pseudo != NULL)
+			if (ligne == nbLigne)// nb ligne choisit
 			{
-				clt->IPclient = strtok(NULL,":");
-				printf("%s\n", clt->IPclient);
-	
+				fgets(chaine,compteur,fic);
+				printf("fgets %s \n",chaine);
+				clt->pseudo = strtok(chaine,":");
+				printf("%s\n", clt->pseudo);
 				if (clt->pseudo != NULL)
 				{
-					clt->portClient = strtok(NULL,":");
-					printf("%s\n", clt->portClient );
+					clt->IPclient = strtok(NULL,":");
+					printf("%s\n", clt->IPclient);
+	
+					if (clt->pseudo != NULL)
+					{
+						clt->portClient = strtok(NULL,":");
+						printf("%s\n", clt->portClient );
+					}
 				}
+				else
+				{
+					printf("erreur Decoupage");
+				} 
 			}
-			else
-			{
-			printf("erreur Decoupage");
-			} 	
+		}
+			
  		fclose(fic);
 	} 
 }
@@ -112,9 +95,7 @@ int main()
 {
 	T_Client C;
 	init(&C,0);
-	/*int NbLigne = nbLigne();
-	printf("il y a : %d ligne(s)\n",NbLigne);*/
-	lireEnregistrement(&C);
+	lireEnregistrement(&C,9);
 	Affiche(&C);
  
 

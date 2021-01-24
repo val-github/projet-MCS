@@ -1,3 +1,23 @@
+/* ------------------------------------------------------------------------ */
+/**
+ *  \file       Tchatstream.c
+ *  \brief      Programme utilisant les sockets pour réaliser un serveur multi client
+ *
+ *  \author     Valentine Petit et Valentin Blet Le3 TDA
+ *
+ *  \date       début : 08 janvier fin : 28 janvier
+ *
+ *	\version    3.0
+ * *
+ *	\remark		Le fichier doit être compiler avec -DSERVEUR pour être executer en temps que serveur
+ *                      et -DCLIENT pour être executer en temps que client.
+ *                      Il faut aussi ajouter -lpthread car nous utilisons les threads
+ *
+ */
+
+/* ------------------------------------------------------------------------ */
+/*		I N C L U D Es  S T A N D A R D S       		    */
+/* ------------------------------------------------------------------------ */
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -11,6 +31,10 @@
 #include <string.h>
 #include <pthread.h>
 
+
+/* ------------------------------------------------------------------------ */
+/*		C O N S T A N T E S   S Y M B O L I Q U E S		    */
+/* ------------------------------------------------------------------------ */
 #define CHECK(sts, msg) if ((sts)==-1) {perror(msg); exit(-1);}
 #define NBCLIENT 5
 #define MAX_BUFF 512
@@ -18,6 +42,10 @@
 #define ADDR_SRV "127.0.0.24"
 #define MAX_CHAR 256
 #define NOM_FICHIER "enregistrement.txt"
+
+/* ------------------------------------------------------------------------ */
+/*		D E F I N I T I O N S    D E     T Y P E S		    */
+/* ------------------------------------------------------------------------ */
 typedef char message_t[MAX_BUFF];
 
 typedef struct
@@ -28,24 +56,35 @@ typedef struct
 	char *  portClient;
 }T_Client;
 
+/* ------------------------------------------------------------------------ */
+/*		V A R I A B L E S   G L O B A L E S   			    */
+/* ------------------------------------------------------------------------ */
 pthread_t tid[NBCLIENT];
+int socketEcoute; /*socket écoute*/
+pid_t pid;
 
-// Prototype
+/* ------------------------------------------------------------------------ */
+/*		P R O T O T Y P E S   D E   F O N C T I O N S		    */
+/* ------------------------------------------------------------------------ */
 void fermeture(void);
+void init(T_Client *clt,int NbClient);
+void Affiche(T_Client *clt);
+int comparer(const char truck1[], const char truck2[]);
+int tailleChaine(const char truck[]);
+void ecrireFichierEnregistrement(char * pseudo, char * IpClient, int PortClient);
+void lireEnregistrement(T_Client *clt,int nbLigne);
+
 void dialClt2Srv(int sad);
 char dialSrv2Clt(int sd, struct sockaddr_in *cltAdr);
 void dialClt2Clt(char msg);
-void serveur (void);
-int acceptClt(int socketEcoute, struct sockaddr_in *cltAdr);
-void client ();
-int comparer(const char truck1[], const char truck2[]);
-void lireEnregistrement(char chaine[][MAX_CHAR]);
 
-// Variable global
-int socketEcoute; /*socket écoute*/
-pid_t pid;
-void Affiche(T_Client *clt);
-void init (T_Client *clt,int NbClient);
+int acceptClt(int socketEcoute, struct sockaddr_in *cltAdr);
+
+void serveur ();
+void client ();
+/* ------------------------------------------------------------------------ */
+/*		F O N C T I O N     P R I N C I P A L E 	  	    */
+/* ------------------------------------------------------------------------ */
 
 int main () {
 
@@ -59,7 +98,7 @@ int main () {
 	client();
 	#endif
 
-	#ifdef FICHIER
+	#ifdef FICHIER // test futur supp
 	T_Client C;
 	init(&C,0);
 	lireEnregistrement(&C);
@@ -71,18 +110,52 @@ int main () {
 return 0;
 }
 
+
+/* ------------------------------------------------------------------------ */
+
+
+/**
+ *
+ * \fn void fermeture(void)
+ * \brief       Cette fonction permet de fermer la socket d'écoute global
+ *
+ * \param       aucun
+ *
+ * \return      rien
+ *
+ */
 void fermeture(void)
 {
 	//Fermeture de la socket
 	CHECK(close(socketEcoute),"--- PB : close()");
 }
 
+/**
+ *
+ * \fn void init (T_Client *clt,int NbClient)
+ * \brief       Cette fonction permet d'initier un Client
+ * \param       T_Client *clt un pointeur sur un client
+ *
+ * \param       int NbClient le numero du client
+ *
+ * \return      rien
+ *
+ */
 void init (T_Client *clt,int NbClient)
 {
 	clt->NbClient=NbClient;
 	printf("je suis le client n° %d\n",clt->NbClient);
 }
 
+/**
+ *
+ * \fn void Affiche(T_Client *clt)
+ * \brief       Cette fonction permet d'afficher les differentes valeurs affecte au client entree en parametre 
+ * \param       T_Client *clt un pointeur sur un client
+ *
+ * \return      rien
+ *
+ */
 void Affiche(T_Client *clt)
 {
 	printf("je suis le client n° %d\n",clt->NbClient);
@@ -92,10 +165,225 @@ void Affiche(T_Client *clt)
 
 }
 
+/**
+ *
+ * \fn void ecrireFichierEnregistrement(char * pseudo, char * IpClient, int PortClient)
+ * \brief       Cette fonction est appele une fois le client connecter au serveur,
+ *       elle permet de renseigner dans le fichier enregistrement.txt, 
+ *       le port du Client et l'Ip du client et son pseudo
+ * \param       char * IpClient l'Ip d client accepte
+ *
+ * \param       int PortClient le port du client accepte
+ *
+ * \return      rien
+ *
+ */
+void ecrireFichierEnregistrement(char * pseudo, char * IpClient, int PortClient)
+{
 
-int sessionSrv(void) {
 
-int socketEcoute;
+	FILE* fichier = NULL;
+	fichier = fopen(NOM_FICHIER,"r+");// test creer fic sinon r+
+    
+	if ( fichier != NULL)
+	{
+		// on lit et on écrit dans le fichier
+		fseek(fichier, 0, SEEK_END);
+		fprintf(fichier, "%s:%s:%d\n", pseudo, IpClient,PortClient);
+		rewind(fichier);
+		fclose(fichier);// on ferme le fichier qui a été ouvert
+	}
+	else
+	{
+		printf("Impossible d'ouvrir le fichier %s \n",NOM_FICHIER);
+	}
+}
+
+
+
+/**
+ *
+ * \fn void lireEnregistrement(T_Client *clt,int nbLigne)
+ * 
+ * \brief  Cette fonction permet de lire la ligne voulu dans le fichier d'enregistrement 
+ * et de renseigner la struture client passer en parametre
+ *       
+ * \param       T_Client *clt un pointeur sur un client
+ *
+ * \param       int nbLigne la ligne que l'on souhaite lire
+ *
+ * \return      rien
+ *
+ */
+void lireEnregistrement(T_Client *clt,int nbLigne)
+{
+	char caractereActuel;
+	char chaine [MAX_CHAR],str[MAX_CHAR];
+	int c,ligne =0;
+	int compteur = 0;
+	FILE* fichier = NULL;
+	fichier = fopen(NOM_FICHIER,"r");
+    
+	if (fichier != NULL)
+	{
+		while (!feof(fichier))
+		{
+			fgetc(fichier);
+			compteur ++;
+		}
+		compteur = compteur - 1;
+		printf("compteur %d \n",compteur);		
+		fclose(fichier);// on ferme le fichier qui a été ouvert
+	}
+	else
+	{
+		printf("Impossible d'ouvrir le fichier %s \n",NOM_FICHIER);
+	}
+	FILE* fic = NULL;
+	fic = fopen(NOM_FICHIER,"r");
+
+	if (fic != NULL)
+	{
+		while((c=fgetc(fichier)) != EOF)
+		{
+			if(c=='\n')
+				ligne++;
+			if (ligne == nbLigne)// nb ligne choisit
+			{
+				fgets(chaine,compteur,fic);
+				printf("fgets %s \n",chaine);
+				clt->pseudo = strtok(chaine,":");
+				printf("%s\n", clt->pseudo);
+				if (clt->pseudo != NULL)
+				{
+					clt->IPclient = strtok(NULL,":");
+					printf("%s\n", clt->IPclient);
+	
+					if (clt->pseudo != NULL)
+					{
+						clt->portClient = strtok(NULL,":");
+						printf("%s\n", clt->portClient );
+					}
+				}
+				else
+				{
+					printf("erreur Decoupage");
+				} 
+			}
+		}
+			
+ 		fclose(fic);
+	} 
+}
+
+/**
+ *
+ * \fn int tailleChaine(const char chaine[])
+ * 
+ * \brief  Cette fonction permet de calculer la taille de la chaine passer en parametre
+ * 
+ * \param       const char chaine[] table de char dont on veut calculer la longueur
+ *
+ * \return      i : la taille de la chaine
+ *
+ */
+int tailleChaine(const char chaine[])
+{
+    int i=0;
+    while (chaine[i]!='\0')
+    {
+        i++;
+    }
+    return i;
+}
+
+/**
+ *
+ * \fn int comparer(const char chaine1[], const char chaine2[])
+ * 
+ * \brief  Cette fonction permet de comparer les chaines passer en parametre
+ * 
+ * \param       const char chaine1[] table de char qu'on veut comparer
+ *
+ * \param       const char chaine2[] table de char qu'on veut comparer
+ *
+ * \return      1 si elles sont differentes et 0 si elles sont equivalente
+ *
+ */
+int comparer(const char chaine1[], const char chaine2[])
+{
+    long k=0;
+ 
+	if (tailleChaine(chaine1) == tailleChaine(chaine2))
+	{
+    for (k; k<tailleChaine(chaine1) && k<tailleChaine(chaine2); k++)
+    {
+        if (chaine1[k] != chaine2[k])
+            return 1;
+    }
+        return 0;
+	}
+return 1;
+}
+
+
+/**
+ *
+ * \fn char * decoupeLire(char * chaine)
+ * 
+ * \brief  Cette fonction permet de comparer les chaines passer en parametre
+ * 
+ * \param       char * chaine table de char qu'on veut decouper
+ *
+ * \return      (PseudoClient, IpClient, PortClient)
+ *
+ */
+// INUTILE MNT PUISQUE DANS LIRE
+
+char * decoupeLire(char * chaine)
+{
+	printf("debut decoupe lire");
+	char *PseudoClient = NULL;
+	char *IpClient = NULL;
+	char *PortClient = NULL;
+
+	PseudoClient = strtok(chaine,":");
+	printf("%s\n", PseudoClient);
+	if (PseudoClient != NULL)
+	{
+		IpClient = strtok(NULL,":");
+		printf("%s\n", IpClient);
+	
+		if (PseudoClient != NULL)
+		{
+			PortClient = strtok(NULL,":");
+			printf("%s\n", PortClient);
+		}
+	}
+	else
+	{
+		return NULL;
+	}
+return (PseudoClient, IpClient, PortClient);
+}
+
+
+/**
+ *
+ * \fn int sessionSrv()
+ * 
+ * \brief  Cette fonction permet d'initialiser le serveur
+ * elle cree la socket d'ecoute puis l'associe a l'adresse ip et la met sur ecoute
+ * 
+ * \param       aucun
+ *
+ * \return      socketEcoute : la socket d'ecoute cree
+ *
+ */
+int sessionSrv()
+{
+
+	int socketEcoute;
 
 	struct sockaddr_in seAdr;
 
@@ -128,123 +416,18 @@ int socketEcoute;
 
 }
 
-// ecrire Pseudo + IP CLIENT + PORT CLIENT
-void ecrireFichierEnregistrement(char * IpClient, int PortClient)
-{
-char * PseudoClient = "passage04";
 
-	FILE* fichier = NULL;
-	fichier = fopen(NOM_FICHIER,"r+");// test creer fic sinon r+
-    
-	if ( fichier != NULL)
-	{
-		// on lit et on écrit dans le fichier
-		fseek(fichier, 0, SEEK_END);
-		fprintf(fichier, "%s:%s:%d\n", PseudoClient, IpClient,PortClient);
-		rewind(fichier);
-		fclose(fichier);// on ferme le fichier qui a été ouvert
-	}
-	else
-	{
-		printf("Impossible d'ouvrir le fichier %s \n",NOM_FICHIER);
-	}
-//pb
-}
-
-// lire pseudo + IP CLIENT + PORT CLIENT
-// fonctionnement: récupére toutes les lignes du fichier et les stocke dans une
-// liste (une ligne = un élément)
-// à modifier
-void lireEnregistrement(T_Client *clt)
-{
-	int caractereActuel = 0;
-	char chaine [MAX_CHAR],str[MAX_CHAR];
-	int ligne =0;
-	int compteur = 0;
-	FILE* fichier = NULL;
-	fichier = fopen(NOM_FICHIER,"r");
-    
-	if (fichier != NULL)
-	{
-		 while (!feof(fichier))
-		{
-			fgetc(fichier);
-			compteur ++;
-		}
-		compteur = compteur - 1;
-		printf("compteur %d \n",compteur);		
-		fclose(fichier);// on ferme le fichier qui a été ouvert
-	}
-	else
-	{
-		printf("Impossible d'ouvrir le fichier %s \n",NOM_FICHIER);
-	}
-	FILE* fic = NULL;
-	fic = fopen(NOM_FICHIER,"r");
-
-	if (fic != NULL)
-	{
-		while(ligne < 10)
-		{
-			caractereActuel = fgetc(fic);
-			if ( caractereActuel == "\n")
-			{
-				ligne++;
-			}
-		}
-
-			fgets(chaine,compteur,fic);
-			printf("fgets %s \n",chaine);
-			clt->pseudo = strtok(chaine,":");
-			printf("%s\n", clt->pseudo);
-			if (clt->pseudo != NULL)
-			{
-				clt->IPclient = strtok(NULL,":");
-				printf("%s\n", clt->IPclient);
-	
-				if (clt->pseudo != NULL)
-				{
-					clt->portClient = strtok(NULL,":");
-					printf("%s\n", clt->portClient );
-				}
-			}
-			else
-			{
-			printf("erreur Decoupage");
-			} 	
- 		fclose(fic);
-	} 
-}
-
-// lire pseudo + IP CLIENT + PORT CLIENT
-char* decoupeLire(char * chaine)
-{
-	printf("debut decoupe lire");
-	char *PseudoClient = NULL;
-	char *IpClient = NULL;
-	char *PortClient = NULL;
-
-	PseudoClient = strtok(chaine,":");
-	printf("%s\n", PseudoClient);
-	if (PseudoClient != NULL)
-	{
-		IpClient = strtok(NULL,":");
-		printf("%s\n", IpClient);
-	
-		if (PseudoClient != NULL)
-		{
-			PortClient = strtok(NULL,":");
-			printf("%s\n", PortClient);
-		}
-	}
-	else
-	{
-		return NULL;
-	}
-   return (PseudoClient, IpClient, PortClient);
-}
-
-//fonction des threads de dialogue
+/**
+ *
+ * \fn void *ThreadDialogue (int socketEcoute)
+ * 
+ * \brief  Cette fonction permet le dialogue entre le client et le serveur et le envoie un message a tous les clients
+ * 
+ * \param       int socketEcoute la socket qui va dialoguer
+ *
+ * \return      rien
+ *
+ */
 void *ThreadDialogue (int socketEcoute)
 {
 	struct sockaddr_in cltAdr;
@@ -273,9 +456,19 @@ void *ThreadDialogue (int socketEcoute)
 	
 }
 
-// fonction qui gére l'envoi des messages à tout les clients
-// (récupére les infos des différents clients et leur transmet msg)
-void dialClt2Clt(char msg){
+/**
+ *
+ * \fn void dialClt2Clt(char msg)
+ * 
+ * \brief  Cette fonction recupere les infos des différents clients et leur transmet msg
+ * 
+ * \param       char msg le message a envoyer 
+ *
+ * \return      rien
+ *
+ */
+void dialClt2Clt(char msg)
+{
 	char fichier[NBCLIENT]; 
 	char pseudo, ip, port;
 	int i = 0;
@@ -313,7 +506,19 @@ void dialClt2Clt(char msg){
 }
 
 
-void serveur(void)
+/**
+ *
+ * \fn void dialClt2Clt(char msg)
+ * 
+ * \brief   Fonction principale du mode serveur, mets en place le serveur
+ * ( fait appele a sessionSrv() ) et attend la connexion des clients
+ * 
+ * \param       aucun
+ *
+ * \return      rien
+ *
+ */
+void serveur()
 {
 	printf("début serveur\n");
 	//Déclaration de socket d'écoute et dialogue
@@ -344,34 +549,19 @@ void serveur(void)
 	CHECK(close(socketEcoute),"-- PB : close()");
 }
 
-long tailleChaine(const char truck[])
-{
-    long i=0;
-    while (truck[i]!='\0')
-    {
-        i++;
-    }
-    return i;
-}
-
-//fonction pour détecter si le message envoyé est le message d'arret (stop)
-int comparer(const char truck1[], const char truck2[])
-{
-    long k=0;
- 
-	if (tailleChaine(truck1) == tailleChaine(truck2))
-	{
-    for (k; k<tailleChaine(truck1) && k<tailleChaine(truck2); k++)
-    {
-        if (truck1[k] != truck2[k])
-            return 1;
-    }
-        return 0;
-	}
-return 1;
-}
-
-
+/**
+ *
+ * \fn char dialSrv2Clt(int socketDialogue, struct sockaddr_in *cltAdr)
+ * 
+ * \brief   Cette fonction permet le dialogue du serveur au client
+ * 
+ * \param       int socketDialogue la socket de dialogue
+ *
+ * \param       struct sockaddr_in *cltAdr la socket du client
+ *
+ * \return      rien
+ *
+ */
 char dialSrv2Clt(int socketDialogue, struct sockaddr_in *cltAdr) {
 	// Dialogue avec le client
 	// Ici, lecture d'une requête et envoi du fichier
@@ -391,13 +581,24 @@ char dialSrv2Clt(int socketDialogue, struct sockaddr_in *cltAdr) {
 	return buff;
 }
 
-///////////////////////////////////////////////////////////////////////////////
-//partie client
-
+/**
+ *
+ * \fn int acceptClt(int socketEcoute, struct sockaddr_in *cltAdr)
+ * 
+ * \brief   Cette fonction permet d'accepter la connexion d'un client au serveur
+ * 
+ * \param       int socketEcoute la socket d'ecoute
+ *
+ * \param       struct sockaddr_in *cltAdr la socket du client
+ *
+ * \return      socketDialogue la socket de dialogue
+ *
+ */
 int acceptClt(int socketEcoute, struct sockaddr_in *cltAdr)
 {
 	//Déclaration de socket de dialogue
 	int socketDialogue;
+	char pseudo[MAX_CHAR];
 	socklen_t lenCltAdr=sizeof(*cltAdr);
 
 	// Attente d'une connexion client : accept() côté serveur & connect côté client
@@ -408,13 +609,27 @@ int acceptClt(int socketEcoute, struct sockaddr_in *cltAdr)
 
 	printf("[SERVEUR]:Acceptation de connexion du client [%s:%d]\n", inet_ntoa(cltAdr->sin_addr), ntohs(cltAdr->sin_port));
 
+	printf("[SERVEUR]:Veuillez entrer votre pseudo :\n");
+	scanf("%s",pseudo);// a tester
+
 	// on enregistre l'arrivé du client
-	ecrireFichierEnregistrement(inet_ntoa(cltAdr->sin_addr), ntohs(cltAdr->sin_port));
+	ecrireFichierEnregistrement(pseudo,inet_ntoa(cltAdr->sin_addr), ntohs(cltAdr->sin_port));
 
 
 	return socketDialogue;
 }
 
+/**
+ *
+ * \fn void dialClt2Srv(int sad)
+ * 
+ * \brief   Cette fonction permet le dialogue entre un client et le serveur
+ * 
+ * \param       int sad la socket de dialogue
+ *
+ * \return      rien
+ *
+ */
 void dialClt2Srv(int sad)
 {
 	struct sockaddr_in sadAdr;
@@ -460,7 +675,19 @@ void dialClt2Srv(int sad)
 	CHECK(close(sad),"-- PB : close()");
 }
 
-int sessionClt(void) {
+/**
+ *
+ * \fn int sessionClt()
+ * 
+ * \brief   Cette fonction permet l'initialisation de la socket client
+ * 
+ * \param       aucun
+ *
+ * \return      sad : la socket de dialogue
+ *
+ */
+int sessionClt()
+{
 	int sad;
 	// Création d’une socket INET/STREAM d'appel et de dialogue
 	CHECK(sad = socket(PF_INET, SOCK_STREAM, 0),"-- PB : socket()");
@@ -470,7 +697,19 @@ int sessionClt(void) {
 	return sad;
 }
 
-void connectSrv(int sad) {
+/**
+ *
+ * \fn void connectSrv(int sad)
+ * 
+ * \brief   Cette fonction permet la connexion avec le serveur
+ * 
+ * \param       int sad : socket de dialogue
+ *
+ * \return      rien
+ *
+ */
+void connectSrv(int sad)
+{
 	struct sockaddr_in srvAdr;
 
 	// le client doit fournir l'adresse du serveur
@@ -485,7 +724,20 @@ void connectSrv(int sad) {
 				inet_ntoa(srvAdr.sin_addr), ntohs(srvAdr.sin_port), sad);	
 }
 
-void client() {
+/**
+ *
+ * \fn void client()
+ * 
+ * \brief   Fonction principale du mode client
+ * permet de mettre en place ( sessionClt , connectSrv, dialClt2Srv)
+ * 
+ * \param       aucun
+ *
+ * \return      rien
+ *
+ */
+void client()
+{
 	printf ("lancement client");
 	int sad /*socket appel et dialogue*/;
 
