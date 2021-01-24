@@ -26,9 +26,12 @@ pthread_t tid[NBCLIENT];
 void fermeture(void);
 void dialClt2Srv(int sad);
 char dialSrv2Clt(int sd, struct sockaddr_in *cltAdr);
+void dialClt2Clt(char msg);
 void serveur (void);
 int acceptClt(int socketEcoute, struct sockaddr_in *cltAdr);
 void client ();
+int comparer(const char truck1[], const char truck2[]);
+char** lireEnregistrement();
 
 // Variable global
 int socketEcoute; /*socket écoute*/
@@ -48,7 +51,17 @@ int main () {
 	#endif
 
 	#ifdef FICHIER
-	lireEnregistrement();
+	char** fichier;
+	fichier = lireEnregistrement();
+	int i, j;
+
+   	for(i = 0; i < NBCLIENT; i++)
+   	{
+      	for(j = 0; j < MAX_CHAR; j++)
+         	printf("%d ", fichier[i][j]);
+
+      	puts("");
+   	}
 	#endif
 
 	printf("Fin de l'application\n");
@@ -124,11 +137,11 @@ char * PseudoClient = "passage04";
 // lire pseudo + IP CLIENT + PORT CLIENT
 // fonctionnement: récupére toutes les lignes du fichier et les stocke dans une
 // liste (une ligne = un élément)
-// a modifer
-char lireEnregistrement()
+// à modifier
+char** lireEnregistrement()
 {
 	int caractereActuel = 0;
-	char chaine[MAX_CHAR] = "";
+	char chaine[NBCLIENT][MAX_CHAR], str[MAX_CHAR];
 	int compteur = 0;
 	FILE* fichier = NULL;
 	fichier = fopen(NOM_FICHIER,"r");
@@ -138,9 +151,10 @@ char lireEnregistrement()
 		// on lit caractères par caractère
 		 while (!feof(fichier)) // Jusqu'a fin fichier
 		{
-			//chaine.add(fgetc(fichier));
+			fgets(str, MAX_CHAR, fichier);
 			compteur ++;
 		}
+		compteur = compteur - 1;
 		printf("compteur %d \n",compteur);		
 		fclose(fichier);// on ferme le fichier qui a été ouvert
 	}
@@ -151,13 +165,17 @@ char lireEnregistrement()
 
 	FILE* fic = NULL;
 	fic = fopen(NOM_FICHIER,"r");
+
 	if (fic != NULL)
 	{
- 		fgets(chaine,compteur-1,fic);
-		printf("fgets %s \n",chaine);	
-		fclose(fic);
+		for (int i = 0; i < compteur; i++)
+		{
+			fgets(chaine[i],MAX_CHAR,fic);
+			printf("fgets %s \n",chaine[i]);
+		}
+ 		fclose(fic);
 	} 
-	return chaine;
+	return &chaine;
 }
 
 // lire pseudo + IP CLIENT + PORT CLIENT
@@ -194,17 +212,23 @@ void *ThreadDialogue (int socketEcoute)
 	struct sockaddr_in cltAdr;
 	int socketDialogue;
 	char msg;
+	int req = 1;
 	//création d'une socket de dialogue
 	socketDialogue=acceptClt(socketEcoute, &cltAdr);
-	while(msg != "true"){
-		
-		CHECK(pid=fork(), "PB-- fork()");
-		msg = dialSrv2Clt(socketDialogue, &cltAdr);
+	while(1){
 		// dialogue avec le client connecté
+		msg = dialSrv2Clt(socketDialogue, &cltAdr);
 		
+		//si le message est stop, le client se déconnecte
+		req = comparer(msg,"stop");
+		if (req == 0)
+		{
+			printf("déconnection du client");
+			break;
+		}
 
-
-
+		//envoi du message à tout les clients
+		dialClt2Clt(msg);
 	}
 	// Fermeture de la socket de dialogue
 	CHECK(close(socketDialogue),"-- PB : close()");
@@ -219,19 +243,23 @@ void dialClt2Clt(char msg){
 	int i = 0;
 
 	//fichier = lireEnregistrement();
+	//lecture des lignes du fichier (1 ligne <=> 1 client)
 	while (1){
 		if (decoupeLire(fichier[i]) == NULL){
 			break;
 		}
+		//on récupére les informations des clients pour leur transmettre le message
 		pseudo = decoupeLire(fichier[i])[0];
 		ip = decoupeLire(fichier[i])[1];
 		port = decoupeLire(fichier[i])[2];
 
 		int sad;
 		struct sockaddr_in srvAdr;
+
 		// Création d’une socket INET/STREAM d'appel et de dialogue
 		CHECK(sad = socket(PF_INET, SOCK_STREAM, 0),"-- PB : socket()");
 		
+		//adressage de la socket
 		srvAdr.sin_family = PF_INET;
 		srvAdr.sin_port = htons(port);		
 		srvAdr.sin_addr.s_addr = inet_addr(ip);
@@ -278,7 +306,6 @@ void serveur(void)
 	CHECK(close(socketEcoute),"-- PB : close()");
 }
 
-
 long tailleChaine(const char truck[])
 {
     long i=0;
@@ -289,7 +316,8 @@ long tailleChaine(const char truck[])
     return i;
 }
 
-long comparer(const char truck1[], const char truck2[])
+//fonction pour détecter si le message envoyé est le message d'arret (stop)
+int comparer(const char truck1[], const char truck2[])
 {
     long k=0;
  
@@ -310,7 +338,6 @@ char dialSrv2Clt(int socketDialogue, struct sockaddr_in *cltAdr) {
 	// Dialogue avec le client
 	// Ici, lecture d'une requête et envoi du fichier
 	message_t buff;
-	char req;
 
 	memset(buff, 0, MAX_BUFF);
 	printf("\t[SERVER]:Attente de réception d'une requête\n");
@@ -319,17 +346,11 @@ char dialSrv2Clt(int socketDialogue, struct sockaddr_in *cltAdr) {
 	printf("\t[SERVER]:Requête reçue : ##%s##\n", buff);
 	printf("\t\t[SERVER]:du client d'adresse [%s:%d]\n",
 			inet_ntoa(cltAdr->sin_addr), ntohs(cltAdr->sin_port));
-	req = comparer(buff,"stop");
-	if (req == 0)
-	{
-		printf("BUT ALORS YOU ARE FRENCH !");
-		return "true";
-		
-	}
+
 	// si client demande le fichier on lui lit enregistrement puis on l'envoie
 	CHECK(shutdown(socketDialogue, SHUT_WR),"-- PB : shutdown()");
-	return "false";
 	sleep(1);
+	return buff;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -363,9 +384,9 @@ void dialClt2Srv(int sad)
 	message_t buff;
 	char MSG[MAX_CHAR] = "NULL";
     
-	while (MSG != "stop"){
+	while (1)
+	{
         //lecture du message ecrit par le client
-
 		fgets(MSG, MAX_CHAR, stdin);
 		MSG[strlen(MSG)-1]='\0';
 
@@ -382,20 +403,23 @@ void dialClt2Srv(int sad)
 	    printf("\t\t[CLIENT]: avec l'adresse [%s:%d]\n",
 				    inet_ntoa(sadAdr.sin_addr), ntohs(sadAdr.sin_port));
 
+		//test d'arret de la discussion
+        int req = comparer(MSG,"stop");
+		if (req == 0)
+		{
+			printf("");
+			break;
+		}
+
 	    // Attente d'une réponse
 	    memset(buff, 0, MAX_BUFF);
-		while (buff == "NULL"){
-			CHECK(recv(sad, buff, MAX_BUFF, 0),"-pb reception message serveur");
-	    	printf("\t[CLIENT]:Réception d'une réponse sur [%d]\n", sad);
-	    	printf("\t\t[CLIENT]:Réponse reçue : ##%s##\n", buff);
-		}
-	    
-        //test d'arret de la discussion
-        if (buff == "stop"){
-            printf("fin de la discussion");
-            break;
-        }
+		CHECK(recv(sad, buff, MAX_BUFF, 0),"-pb reception message serveur");
+	    printf("\t[CLIENT]:Réception d'une réponse sur [%d]\n", sad);
+	    printf("\t\t[CLIENT]:Réponse reçue : ##%s##\n", buff); 
     }
+
+	//fermeture de la socket de dialogue
+	CHECK(close(sad),"-- PB : close()");
 }
 
 int sessionClt(void) {
@@ -437,8 +461,5 @@ void client() {
 	// Dialogue du client avec le serveur
 	dialClt2Srv(sad);
 
-	// Fermeture de la socket de dialogue
-	getchar();
-	CHECK(close(sad),"-- PB : close()");	
 }
 
