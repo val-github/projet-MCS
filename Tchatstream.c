@@ -20,6 +20,14 @@
 #define NOM_FICHIER "enregistrement.txt"
 typedef char message_t[MAX_BUFF];
 
+typedef struct
+{
+	int NbClient;
+	char * pseudo;
+	char * IPclient;
+	char *  portClient;
+}T_Client;
+
 pthread_t tid[NBCLIENT];
 
 // Prototype
@@ -31,12 +39,13 @@ void serveur (void);
 int acceptClt(int socketEcoute, struct sockaddr_in *cltAdr);
 void client ();
 int comparer(const char truck1[], const char truck2[]);
-char** lireEnregistrement();
+void lireEnregistrement(char chaine[][MAX_CHAR]);
 
 // Variable global
 int socketEcoute; /*socket écoute*/
 pid_t pid;
-
+void Affiche(T_Client *clt);
+void init (T_Client *clt,int NbClient);
 
 int main () {
 
@@ -51,17 +60,10 @@ int main () {
 	#endif
 
 	#ifdef FICHIER
-	char** fichier;
-	fichier = lireEnregistrement();
-	int i, j;
-
-   	for(i = 0; i < NBCLIENT; i++)
-   	{
-      	for(j = 0; j < MAX_CHAR; j++)
-         	printf("%d ", fichier[i][j]);
-
-      	puts("");
-   	}
+	T_Client C;
+	init(&C,0);
+	lireEnregistrement(&C);
+	Affiche(&C);
 	#endif
 
 	printf("Fin de l'application\n");
@@ -73,6 +75,21 @@ void fermeture(void)
 {
 	//Fermeture de la socket
 	CHECK(close(socketEcoute),"--- PB : close()");
+}
+
+void init (T_Client *clt,int NbClient)
+{
+	clt->NbClient=NbClient;
+	printf("je suis le client n° %d\n",clt->NbClient);
+}
+
+void Affiche(T_Client *clt)
+{
+	printf("je suis le client n° %d\n",clt->NbClient);
+	printf("j'ai le pseudo %s\n",clt->pseudo);
+	printf("j'ai l'adresse n° %s\n",clt->IPclient);
+	printf("j'ai le port n° %s\n",clt->portClient);
+
 }
 
 
@@ -138,20 +155,20 @@ char * PseudoClient = "passage04";
 // fonctionnement: récupére toutes les lignes du fichier et les stocke dans une
 // liste (une ligne = un élément)
 // à modifier
-char** lireEnregistrement()
+void lireEnregistrement(T_Client *clt)
 {
 	int caractereActuel = 0;
-	char chaine[NBCLIENT][MAX_CHAR], str[MAX_CHAR];
+	char chaine [MAX_CHAR],str[MAX_CHAR];
+	int ligne =0;
 	int compteur = 0;
 	FILE* fichier = NULL;
 	fichier = fopen(NOM_FICHIER,"r");
     
 	if (fichier != NULL)
 	{
-		// on lit caractères par caractère
-		 while (!feof(fichier)) // Jusqu'a fin fichier
+		 while (!feof(fichier))
 		{
-			fgets(str, MAX_CHAR, fichier);
+			fgetc(fichier);
 			compteur ++;
 		}
 		compteur = compteur - 1;
@@ -162,20 +179,41 @@ char** lireEnregistrement()
 	{
 		printf("Impossible d'ouvrir le fichier %s \n",NOM_FICHIER);
 	}
-
 	FILE* fic = NULL;
 	fic = fopen(NOM_FICHIER,"r");
 
 	if (fic != NULL)
 	{
-		for (int i = 0; i < compteur; i++)
+		while(ligne < 10)
 		{
-			fgets(chaine[i],MAX_CHAR,fic);
-			printf("fgets %s \n",chaine[i]);
+			caractereActuel = fgetc(fic);
+			if ( caractereActuel == "\n")
+			{
+				ligne++;
+			}
 		}
+
+			fgets(chaine,compteur,fic);
+			printf("fgets %s \n",chaine);
+			clt->pseudo = strtok(chaine,":");
+			printf("%s\n", clt->pseudo);
+			if (clt->pseudo != NULL)
+			{
+				clt->IPclient = strtok(NULL,":");
+				printf("%s\n", clt->IPclient);
+	
+				if (clt->pseudo != NULL)
+				{
+					clt->portClient = strtok(NULL,":");
+					printf("%s\n", clt->portClient );
+				}
+			}
+			else
+			{
+			printf("erreur Decoupage");
+			} 	
  		fclose(fic);
 	} 
-	return &chaine;
 }
 
 // lire pseudo + IP CLIENT + PORT CLIENT
