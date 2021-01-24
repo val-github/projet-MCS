@@ -105,7 +105,9 @@ char * PseudoClient = "passage04";
 	if ( fichier != NULL)
 	{
 		// on lit et on écrit dans le fichier
-		fprintf(fichier, "%s:%s:%d", PseudoClient, IpClient,PortClient);
+		fseek(fichier, 0, SEEK_END);
+		fprintf(fichier, "%s:%s:%d\n", PseudoClient, IpClient,PortClient);
+		rewind(fichier);
 		fclose(fichier);// on ferme le fichier qui a été ouvert
 	}
 	else
