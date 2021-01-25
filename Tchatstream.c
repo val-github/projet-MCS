@@ -66,7 +66,7 @@ pid_t pid;
 /* ------------------------------------------------------------------------ */
 /*		P R O T O T Y P E S   D E   F O N C T I O N S		    */
 /* ------------------------------------------------------------------------ */
-void fermeture(void);
+void fermeture();
 void init(T_Client *clt,int NbClient);
 void Affiche(T_Client *clt);
 int comparer(const char truck1[], const char truck2[]);
@@ -472,8 +472,8 @@ void *ThreadDialogue (int socketEcoute)
 void dialClt2Clt(char msg)
 {
 	char fichier[NBCLIENT]; 
-	char pseudo, ip, port;
-	int i = 0;
+	char * pseudo, * ip, * port;
+	int c,i = 0;
 
 	//lecture des lignes du fichier (1 ligne <=> 1 client)
 	while (1){
@@ -484,10 +484,10 @@ void dialClt2Clt(char msg)
     
 		if (fichier != NULL)
 		{
-			while (!feof(fichier))
+			while((c=fgetc(fichier)) != EOF)
 			{
-				fgets(fichier);
-				compteur ++;
+				if(c=='\n')
+					compteur++;
 			}
 		printf("compteur %d \n",compteur);	
 		compteur = compteur - 1;	
@@ -496,9 +496,9 @@ void dialClt2Clt(char msg)
 		for (int i=0; i<compteur; i++){
 			T_Client cl;
 			//on récupére les informations des clients pour leur transmettre le message
-			lireEnregistrement(cl,i);
-			port = cl->port;
-			ip = cl->IPclient;
+			lireEnregistrement(&cl,i);
+			port = cl.portClient;
+			ip = cl.IPclient;
 
 			int sad;
 			struct sockaddr_in srvAdr;
@@ -559,7 +559,7 @@ void serveur()
 
 	for (int i = 0; i < NBCLIENT; i++)
         CHECK(pthread_join (tid[i], NULL),"pthread_join()");
-    return EXIT_SUCCESS;
+    
 
 	// Fermeture de la socket d'écoute : inutile pour le serveur
 	printf("fin de lecture\n");
@@ -590,7 +590,7 @@ char dialSrv2Clt(int socketDialogue, struct sockaddr_in *cltAdr) {
 
 	printf("\t[SERVER]:Requête reçue : ##%s##\n", buff);
 	printf("\t\t[SERVER]:du client d'adresse [%s:%d]\n",
-			inet_ntoa(cltAdr->sin_addr), ntohs(cltAdr->sin_port));
+			inet_ntoa(cltAdr->sin_addr), ntohs(cltAdr->sin_port)); 
 
 	// si client demande le fichier on lui lit enregistrement puis on l'envoie
 	CHECK(shutdown(socketDialogue, SHUT_WR),"-- PB : shutdown()");
@@ -677,7 +677,7 @@ void dialClt2Srv(int sad)
         int req = comparer(MSG,"stop");
 		if (req == 0)
 		{
-			printf("");
+			printf(" ");
 			break;
 		}
 
