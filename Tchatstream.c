@@ -59,14 +59,15 @@ typedef struct
 /* ------------------------------------------------------------------------ */
 /*		V A R I A B L E S   G L O B A L E S   			    */
 /* ------------------------------------------------------------------------ */
-pthread_t tid[NBCLIENT];
+pthread_t tidSrv[NBCLIENT];
+pthread_t tidClt[2];
 int socketEcoute; /*socket écoute*/
 pid_t pid;
 
 /* ------------------------------------------------------------------------ */
 /*		P R O T O T Y P E S   D E   F O N C T I O N S		    */
 /* ------------------------------------------------------------------------ */
-void fermeture();
+void fermeture(void);
 void init(T_Client *clt,int NbClient);
 void Affiche(T_Client *clt);
 int comparer(const char truck1[], const char truck2[]);
@@ -74,7 +75,7 @@ int tailleChaine(const char truck[]);
 void ecrireFichierEnregistrement(char * pseudo, char * IpClient, int PortClient);
 void lireEnregistrement(T_Client *clt,int nbLigne);
 
-void dialClt2Srv(int sad);
+void *dialClt2Srv(int sad);
 char dialSrv2Clt(int sd, struct sockaddr_in *cltAdr);
 void dialClt2Clt(char msg);
 
@@ -410,12 +411,7 @@ int sessionSrv()
 	// Mise de la socket à l'écoute
 	CHECK(listen(socketEcoute, NBCLIENT), "--PB : listen()"); // Cette fonction définit la taille de la file de connexions en attente pour votre socket .
 	
-
-// Boucle permanente (1 serveur est un daemon)
-	printf("[SERVEUR]:Ecoute de demande de connexion (%d max) sur le canal [%d] d'adresse [%s:%d]\n", NBCLIENT, socketEcoute, inet_ntoa(seAdr.sin_addr), ntohs(seAdr.sin_port));
 	return socketEcoute;
-
-
 }
 
 
@@ -443,10 +439,11 @@ void *ThreadDialogue (int socketEcoute)
 		msg = dialSrv2Clt(socketDialogue, &cltAdr);
 		
 		//si le message est stop, le client se déconnecte
-		req = comparer(msg,"stop");
+		req = comparer(msg,"STOP");
 		if (req == 0)
 		{
-			printf("déconnection du client");
+			char* msgfin = "un client s'est déconnecté";
+			dialClt2Clt(msgfin);
 			break;
 		}
 
@@ -472,8 +469,8 @@ void *ThreadDialogue (int socketEcoute)
 void dialClt2Clt(char msg)
 {
 	char fichier[NBCLIENT]; 
-	char * pseudo, * ip, * port;
-	int c,i = 0;
+	char pseudo, ip, port;
+	int i = 0;
 
 	//lecture des lignes du fichier (1 ligne <=> 1 client)
 	while (1){
@@ -484,10 +481,12 @@ void dialClt2Clt(char msg)
     
 		if (fichier != NULL)
 		{
-			while((c=fgetc(fichier)) != EOF)
+			while (!feof(fichier))
 			{
-				if(c=='\n')
-					compteur++;
+				char c = fgetc(fichier);
+				if (c == "\n"){
+					compteur ++;
+				}
 			}
 		printf("compteur %d \n",compteur);	
 		compteur = compteur - 1;	
@@ -553,13 +552,12 @@ void serveur()
 	{
 		printf("creation thread + %d\n", i);
 		//création du thread qui gérera le dialogue avec le client
-		CHECK(pthread_create (&tid[i], NULL, ThreadDialogue, socketEcoute),
+		CHECK(pthread_create (&tidSrv[i], NULL, ThreadDialogue, socketEcoute),
                 "pthread_create()");
 	}
 
 	for (int i = 0; i < NBCLIENT; i++)
-        CHECK(pthread_join (tid[i], NULL),"pthread_join()");
-    
+        CHECK(pthread_join (tidSrv[i], NULL),"pthread_join()");
 
 	// Fermeture de la socket d'écoute : inutile pour le serveur
 	printf("fin de lecture\n");
@@ -590,7 +588,7 @@ char dialSrv2Clt(int socketDialogue, struct sockaddr_in *cltAdr) {
 
 	printf("\t[SERVER]:Requête reçue : ##%s##\n", buff);
 	printf("\t\t[SERVER]:du client d'adresse [%s:%d]\n",
-			inet_ntoa(cltAdr->sin_addr), ntohs(cltAdr->sin_port)); 
+			inet_ntoa(cltAdr->sin_addr), ntohs(cltAdr->sin_port));
 
 	// si client demande le fichier on lui lit enregistrement puis on l'envoie
 	CHECK(shutdown(socketDialogue, SHUT_WR),"-- PB : shutdown()");
@@ -647,7 +645,7 @@ int acceptClt(int socketEcoute, struct sockaddr_in *cltAdr)
  * \return      rien
  *
  */
-void dialClt2Srv(int sad)
+void *dialClt2Srv(int sad)
 {
 	struct sockaddr_in sadAdr;
 	socklen_t lenSadAdr;
@@ -661,9 +659,9 @@ void dialClt2Srv(int sad)
 		MSG[strlen(MSG)-1]='\0';
 
 	    // Dialogue du client avec le serveur : while(..) { envoiRequete(); attenteReponse();}
-	    printf("\t[CLIENT]:Envoi du message sur [%d]\n", sad);
+	    // printf("\t[CLIENT]:Envoi du message sur [%d]\n", sad);
 	    CHECK(send(sad, MSG, strlen(MSG)+1, 0),"-pb d envois du message");
-	    printf("\t\t[CLIENT]:requête envoyée : ##%s##\n", MSG);
+	    // printf("\t\t[CLIENT]:requête envoyée : ##%s##\n", MSG);
 
 	    // La socket client n'a pas éte bindée càd non adressée
 	    // l'appel send a réalisé un bind (OS) : càd attribuer une adresse à la socket dyn
@@ -672,24 +670,7 @@ void dialClt2Srv(int sad)
 	    CHECK(getsockname(sad, (struct sockaddr *)&sadAdr, &lenSadAdr),"-- PB : bind()");
 	    printf("\t\t[CLIENT]: avec l'adresse [%s:%d]\n",
 				    inet_ntoa(sadAdr.sin_addr), ntohs(sadAdr.sin_port));
-
-		//test d'arret de la discussion
-        int req = comparer(MSG,"stop");
-		if (req == 0)
-		{
-			printf(" ");
-			break;
-		}
-
-	    // Attente d'une réponse
-	    memset(buff, 0, MAX_BUFF);
-		CHECK(recv(sad, buff, MAX_BUFF, 0),"-pb reception message serveur");
-	    printf("\t[CLIENT]:Réception d'une réponse sur [%d]\n", sad);
-	    printf("\t\t[CLIENT]:Réponse reçue : ##%s##\n", buff); 
     }
-
-	//fermeture de la socket de dialogue
-	CHECK(close(sad),"-- PB : close()");
 }
 
 /**
@@ -741,6 +722,24 @@ void connectSrv(int sad)
 				inet_ntoa(srvAdr.sin_addr), ntohs(srvAdr.sin_port), sad);	
 }
 
+void *threadEcoute(int sad)
+{
+	int i = 0;
+	while (i != 1)
+	{
+		int buff;
+
+		// Attente d'une réponse
+		// utilisation thread pour écouter et émettre en
+		memset(buff, 0, MAX_BUFF);
+		CHECK(recv(sad, buff, MAX_BUFF, 0),"-pb reception message serveur");
+		printf("\t[CLIENT]: #	%d	#\n", buff); 
+
+		i = comparer(buff,"STOP");
+	}
+	
+}
+
 /**
  *
  * \fn void client()
@@ -766,7 +765,21 @@ void client()
 	connectSrv(sad);
 
 	// Dialogue du client avec le serveur
-	dialClt2Srv(sad);
+	CHECK(pthread_create (&tidClt[0], NULL, dialClt2Srv(sad), socketEcoute),
+                "pthread_create()");
+	
 
+	// thread d'écoute
+	CHECK(pthread_create (&tidClt[1], NULL, threadEcoute(sad), sad),
+                "pthread_create()");
+
+	//attente de la fermeture du thread d'écoute
+	CHECK(pthread_join (tidClt[1], NULL),"pthread_join()");
+
+	//fermeture du thread d'envoit
+	CHECK(pthread_cancel (tidClt[0]),"pthread_join()");
+
+	CHECK(close(sad),"-- PB : close()");
+	printf("fin de la discussion, a +!");
 }
 
