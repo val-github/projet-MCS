@@ -39,7 +39,7 @@
 #define NBCLIENT 5
 #define MAX_BUFF 512
 #define PORT_SRV 15130
-#define ADDR_SRV "127.0.0.24"
+#define ADDR_SRV "127.0.0.25"
 #define MAX_CHAR 512
 #define NOM_FICHIER "enregistrement.txt"
 
@@ -435,12 +435,16 @@ void *ThreadDialogue (int socketEcoute)
 	char msg;
 	//création d'une socket de dialogue
 	socketDialogue=acceptClt(socketEcoute, &cltAdr);
-	while(msg != "true"){
+	while(1){
 		
 		CHECK(pid=fork(), "PB-- fork()");
 		msg = dialSrv2Clt(socketDialogue, &cltAdr);
 		// dialogue avec le client connecté
-		
+		if (comparer(msg,"stop")){
+			printf("déconnection");
+			break;
+		}
+		dialClt2Clt(msg);
 
 	dialClt2Clt(msg);
 
@@ -581,19 +585,19 @@ void serveur()
 	// Mise en place d'une socket d'écoute prête à la réception des connexions	
 	socketEcoute = sessionSrv();
  	
-	int I=0;
 	//Attente de connexion d'un client
 	for (int i = 0; i < NBCLIENT; i++)
 	{
 		printf("creation thread + %d\n", i);
 		//création du thread qui gérera le dialogue avec le client
-		CHECK(pthread_create (&tid[i], NULL, ThreadDialogue, socketEcoute),
+		CHECK(pthread_create (&tidSrv[i], NULL, ThreadDialogue, socketEcoute),
                 "pthread_create()");
 	}
 
-	for (int i = 0; i < NBCLIENT; i++)
-        CHECK(pthread_join (tid[i], NULL),"pthread_join()");
-    return EXIT_SUCCESS;
+	for (int i = 0; i < NBCLIENT; i++){
+		CHECK(pthread_join (tidSrv[i], NULL),"pthread_join()");
+	}
+        
 
 	// Fermeture de la socket d'écoute : inutile pour le serveur
 	printf("fin de lecture\n");
@@ -714,12 +718,6 @@ void * dialClt2Srv(int sad)
 			printf("");
 			break;
 		}
-
-	    // Attente d'une réponse
-	    memset(buff, 0, MAX_BUFF);
-		CHECK(recv(sad, buff, MAX_BUFF, 0),"-pb reception message serveur");
-	    printf("\t[CLIENT]:Réception d'une réponse sur [%d]\n", sad);
-	    printf("\t\t[CLIENT]:Réponse reçue : ##%s##\n", buff); 
     }
 
 	//fermeture de la socket de dialogue
@@ -773,6 +771,40 @@ void connectSrv(int sad)
 	CHECK(connect(sad, (struct sockaddr *)&srvAdr, sizeof(srvAdr)),"-- PB : connect()");
 	printf("[CLIENT]:Connexion effectuée avec le serveur [%s:%d] par le canal [%d]\n",
 				inet_ntoa(srvAdr.sin_addr), ntohs(srvAdr.sin_port), sad);	
+}
+
+/**
+ *
+ * \fn void client()
+ * 
+ * \brief   Fonction principale du mode client
+ * permet de mettre en place ( sessionClt , connectSrv, dialClt2Srv)
+ * 
+ * \param       aucun
+ *
+ * \return      rien
+ *
+ */
+void client()
+{
+void *threadEcoute(int sad)
+{
+	printf("début threadEcoute");
+	while (1)
+	{
+		int buff;
+
+		// Attente d'une réponse
+		// utilisation thread pour écouter et émettre en
+		memset(buff, 0, MAX_BUFF);
+		CHECK(recv(sad, buff, MAX_BUFF, 0),"-pb reception message serveur");
+		printf("\t[CLIENT]: #	%d	#\n", buff); 
+
+		if (comparer(buff,"STOP") == 0){
+				printf("déconnection");
+				break;
+		}
+	}
 }
 
 /**
