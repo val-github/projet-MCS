@@ -101,7 +101,7 @@ int main () {
 	#ifdef FICHIER // test futur supp
 	T_Client C;
 	init(&C,0);
-	lireEnregistrement(&C);
+	lireEnregistrement(&C,5);
 	Affiche(&C);
 	#endif
 
@@ -206,7 +206,7 @@ void ecrireFichierEnregistrement(char * pseudo, char * IpClient, int PortClient)
  * \fn void lireEnregistrement(T_Client *clt,int nbLigne)
  * 
  * \brief  Cette fonction permet de lire la ligne voulu dans le fichier d'enregistrement 
- * et de renseigner la struture client passer en parametre
+ * et de renseigner la struture client passé en parametre
  *       
  * \param       T_Client *clt un pointeur sur un client
  *
@@ -268,7 +268,9 @@ void lireEnregistrement(T_Client *clt,int nbLigne)
 				else
 				{
 					printf("erreur Decoupage");
-				} 
+				}
+				//ajouté afin que la fonction s'arrete dés qu elle a lut la ligne souhaitée
+				break; 
 			}
 		}
 			
@@ -473,35 +475,50 @@ void dialClt2Clt(char msg)
 	char pseudo, ip, port;
 	int i = 0;
 
-	//fichier = lireEnregistrement();
 	//lecture des lignes du fichier (1 ligne <=> 1 client)
 	while (1){
-		if (decoupeLire(fichier[i]) == NULL){
-			break;
+		//on compte le nombre de clients enregistrés dans le fichier
+		int compteur = 0;
+		FILE* fichier = NULL;
+		fichier = fopen(NOM_FICHIER,"r");
+    
+		if (fichier != NULL)
+		{
+			while (!feof(fichier))
+			{
+				fgets(fichier);
+				compteur ++;
+			}
+		printf("compteur %d \n",compteur);	
+		compteur = compteur - 1;	
+		fclose(fichier);// on ferme le fichier qui a été ouvert
 		}
-		//on récupére les informations des clients pour leur transmettre le message
-		pseudo = decoupeLire(fichier[i])[0];
-		ip = decoupeLire(fichier[i])[1];
-		port = decoupeLire(fichier[i])[2];
+		for (int i=0; i<compteur; i++){
+			T_Client cl;
+			//on récupére les informations des clients pour leur transmettre le message
+			lireEnregistrement(cl,i);
+			port = cl->port;
+			ip = cl->IPclient;
 
-		int sad;
-		struct sockaddr_in srvAdr;
+			int sad;
+			struct sockaddr_in srvAdr;
 
-		// Création d’une socket INET/STREAM d'appel et de dialogue
-		CHECK(sad = socket(PF_INET, SOCK_STREAM, 0),"-- PB : socket()");
+			// Création d’une socket INET/STREAM d'appel et de dialogue
+			CHECK(sad = socket(PF_INET, SOCK_STREAM, 0),"-- PB : socket()");
 		
-		//adressage de la socket
-		srvAdr.sin_family = PF_INET;
-		srvAdr.sin_port = htons(port);		
-		srvAdr.sin_addr.s_addr = inet_addr(ip);
-		memset(&(srvAdr.sin_zero), 0, 8);
+			//adressage de la socket
+			srvAdr.sin_family = PF_INET;
+			srvAdr.sin_port = htons(port);		
+			srvAdr.sin_addr.s_addr = inet_addr(ip);
+			memset(&(srvAdr.sin_zero), 0, 8);
 
-		// demande connexion 
-		CHECK(connect(sad, (struct sockaddr *)&srvAdr, sizeof(srvAdr)),"-- PB : connect()");
-		printf("message transmis au client %d [%s:%d] par le canal [%d]\n", i,
-					inet_ntoa(srvAdr.sin_addr), ntohs(srvAdr.sin_port), sad);
-		CHECK(send(sad, msg, strlen(msg)+1, 0),"-pb d envois du message");
-		i++;
+			// demande connexion 
+			CHECK(connect(sad, (struct sockaddr *)&srvAdr, sizeof(srvAdr)),"-- PB : connect()");
+			printf("message transmis au client %d [%s:%d] par le canal [%d]\n", i,
+						inet_ntoa(srvAdr.sin_addr), ntohs(srvAdr.sin_port), sad);
+			CHECK(send(sad, msg, strlen(msg)+1, 0),"-pb d envois du message");
+		}
+		
 	}
 }
 
