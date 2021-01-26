@@ -36,7 +36,7 @@ char messageRecu[MAX_BUFF]="";
 pthread_t tidClt[2];
 
 void recevoir_message(int socket, char *buffer);
-void envoyer_message(int socket, const char *message);
+void envoyer_message(int socket, char *message);
 int tailleChaine(const char chaine[]);
 
 typedef struct
@@ -55,7 +55,7 @@ void initialiser_string(char string[MAX_BUFF]){
 	sprintf(string,"");
 }
 
-void inialiser_message(){
+void initialiser_message(){
 	sprintf(message," ");
 }
 
@@ -128,10 +128,10 @@ void serveur_multiple(T_Client *client, int socketClient, struct sockaddr_in cln
 		
 
 		do{
-			
 			recevoir_message(client->socket_client,messageRecu);
+			printf("recus: %s \n", messageRecu);
 			if(!atoi(messageRecu) == 0){ //si non stop
-				//chosirNiveau(player,messageRecu);
+				envoyer_message(client->socket_client,messageRecu);
 			}
 		}while(atoi(messageRecu) != 0);
 
@@ -170,7 +170,7 @@ int connexion(char **arguments) {
 	char *adresse=arguments[2];
 
 	printf("port: %d et adresse: %s\n", port,adresse);
-	CHECK(socket_client = socket(AF_INET, SOCK_STREAM, 0), "Erreur création socket client");
+	CHECK(socket_client = socket(PF_INET, SOCK_STREAM, 0), "Erreur création socket client");
 	serv.sin_family = PF_INET;
 
 	//PORT
@@ -251,21 +251,22 @@ int tailleChaine(const char chaine[])
     return i;
 }
 
-void envoyer_message(int socket, const char *message) {
-	CHECK(write(socket, message, strlen(message)+1), "echangeCS.c -> Erreur write");
+void envoyer_message(int socket, char *message) {
+	CHECK(send(socket, message, strlen(message)+1, 0), "echangeCS.c -> Erreur send");
 	printf("envoie message\n");
 }
 
 void recevoir_message(int socket, char *buffer) {
 	//strcpy(buffer,"");
+	memset(buffer, 0, MAX_BUFF);
 	CHECK(read(socket, buffer, MAX_BUFF), "echangeCS.c -> Erreur read");
-	printf("recepetion message\n");
+	printf("reception message %s\n", buffer);
 }
 
 void bienvenue(int socket_client){
 	char pseudo[MAX_BUFF];
 
-	inialiser_message();
+	initialiser_message();
 	printf("\n\n\t\tBienvenue sur le tchat, écrivez votre pseudo: ");
 	scanf("%s",message);
 	
@@ -280,11 +281,14 @@ void bienvenue(int socket_client){
 
 }
 
-void threadEnvoi(int socket_client){
+void threadEnvoi( void* socket_clientV){
+	int socket_client = *((int*) socket_clientV);
 	char msg[MAX_BUFF];
 	while(1){
+		initialiser_message();
 		// lecture message tapé par le client
-		scanf("%s",msg);
+		scanf("%s",message);
+		parse_message(msg,messageRecu,"-",0);
 		if (comparer(msg,"STOP") == 0){
 			envoyer_message(socket_client, msg);
 			break;
@@ -295,10 +299,11 @@ void threadEnvoi(int socket_client){
 			printf("message envoyé");
 		}	
 	}
-	printf("déconnection");
+	printf("déconnection\n");
 }
 
-void threadReception(int socket_client){
+void threadReception( void* socket_clientV){
+	int socket_client = *((int*) socket_clientV);
 	char msg[MAX_BUFF];
 	while(atoi(messageRecu) != 0){
 		// lecture message envoyé par le serveur
@@ -316,14 +321,18 @@ void threadReception(int socket_client){
 
 void dialogue(int socket_client){
 	printf("début dialogue\n");
+
 	//thread d'envoi des messages
-	CHECK(pthread_create(&tidClt[0], NULL, (pf_t) threadEnvoi, &socket_client),
+	CHECK(pthread_create(&tidClt[0], NULL, (pf_t) threadEnvoi, (void *) &socket_client),
                 "pthread_create() threadEnvoi");
+	CHECK(pthread_join (tidClt[0], NULL),"pthread_join()");
+
 	//thread d affichage des messages			
-	CHECK(pthread_create(&tidClt[1], NULL, (pf_t) threadReception, &socket_client),
+	CHECK(pthread_create(&tidClt[1], NULL, (pf_t) threadReception, (void *) &socket_client),
                 "pthread_create() threadReception");
 	
-	CHECK(pthread_join (tidClt[0], NULL),"pthread_join()");
+	//attente de la fin des threads
+	
 	CHECK(pthread_join (tidClt[1], NULL),"pthread_join()");
 }
 
@@ -372,7 +381,7 @@ int s,clntLen,newsock;
 																										//et récupère les infos du client
 			serveur_multiple(client,newsock,clnt,&nb_client);
 		}
-		close(s);
+		//close(s);
 	}
 #endif
 	return 0;
