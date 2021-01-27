@@ -222,7 +222,7 @@ void * serveur_multiple(void* argvoid){
 		//envoyer_message(client->socket_client,messageRecu);
 
 		//envoir du message à tout les clients
-		int compteur = 0;
+		/*int compteur = 0;
 		FILE* fichier = NULL;
 		fichier = fopen(NOM_FICHIER,"r");
 		int clntLen,newsock,s;
@@ -242,9 +242,44 @@ void * serveur_multiple(void* argvoid){
 			compteur = compteur - 1;
 			printf("compteur %d \n",compteur);	
 			fclose(fichier);// on ferme le fichier qui a été ouvert
+		}*/
+		int clntLen,newsock,s;
+	struct sockaddr_in clnt1;
+	clntLen = sizeof(clnt1);
+	int compteur = 0;
+	int c,ligne=0;
+	FILE* fichier = NULL;
+	fichier = fopen(NOM_FICHIER,"r");
+    
+	if (fichier != NULL)
+	{
+		while (!feof(fichier))
+		{
+			fgetc(fichier);
+			compteur ++;
 		}
-		
-		for (int i=0; i<compteur; i++)
+		compteur = compteur - 1;
+		printf("compteur %d \n",compteur);		
+		fclose(fichier);// on ferme le fichier qui a été ouvert
+	}
+	else
+	{
+		printf("Impossible d'ouvrir le fichier %s \n",NOM_FICHIER);
+	}
+	FILE* fic = NULL;
+	fic = fopen(NOM_FICHIER,"r");
+
+	if (fic != NULL)
+	{
+		while((c=fgetc(fichier)) != EOF)
+		{
+			if(c=='\n')
+				ligne++;
+		}
+		printf("LIGNE %d \n",ligne);	
+	fclose(fic);	
+	}	
+		for (int i=0; i<ligne; i++)
 		{
 			T_Client *cl;
 			//on récupére les informations des clients pour leur transmettre le message
