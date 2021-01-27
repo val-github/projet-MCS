@@ -225,7 +225,8 @@ void * serveur_multiple(void* argvoid){
 		int compteur = 0;
 		FILE* fichier = NULL;
 		fichier = fopen(NOM_FICHIER,"r");
-		int clntLen,newsock,s,c;
+		int clntLen,newsock,s;
+		char c;
 		struct sockaddr_in clnt1;
 		clntLen = sizeof(clnt1);
 
@@ -237,8 +238,9 @@ void * serveur_multiple(void* argvoid){
 					compteur ++;
 				}
 			}
+
+			compteur = compteur - 1;
 			printf("compteur %d \n",compteur);	
-			compteur = compteur - 1;	
 			fclose(fichier);// on ferme le fichier qui a été ouvert
 		}
 		
@@ -273,6 +275,7 @@ void * serveur_multiple(void* argvoid){
 			// demande connexion 
 			printf("connection");
 			
+
 			CHECK(newsock = accept(s, (struct sockaddr*)&clnt1, (socklen_t*)&clntLen), "PB -- accept()");
 			envoyer_message(newsock,messageRecu);
 			printf ("message envoyé a %s", cl->pseudo);
@@ -560,14 +563,15 @@ int socket_client;
 			//création threads serveur
 			CHECK(pthread_create (&tidSrv[i], NULL, serveur_multiple, (void *) &arg),
                 	"pthread_create()");
-			printf("thread lancé");
-			//serveur_multiple(client,newsock,clnt);
+			printf("thread lancé\n");
+			
 		}
 		
 		for (int i = 0; i < NBCLIENT; i++)
 		{
 			CHECK(pthread_join (tidSrv[i], NULL),"pthread_join()");
 		}
+		//serveur_multiple(client,newsock,clnt);
 		//close(s);
 	}
 #endif
