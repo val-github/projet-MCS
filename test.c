@@ -33,11 +33,14 @@
 
 char message[MAX_BUFF]="";
 char messageRecu[MAX_BUFF]="";
+pthread_t tidSrv[NBCLIENT];
 pthread_t tidClt[2];
 
 void recevoir_message(int socket, char *buffer);
 void envoyer_message(int socket, char *message);
 int tailleChaine(const char chaine[]);
+int comparer(const char chaine1[], const char chaine2[]);
+int parse_message(char *buffer,const char *str, const char *delim, int position);
 
 typedef struct
 {
@@ -67,79 +70,88 @@ void viderBuffer()
     } 
 }
 
-void check_pseudo(T_Client *client){//vérification de l'existence du pseudo
-	FILE* fclient=NULL;
-	fclient=fopen(NOM_FICHIER,"r+");
-	int flag=0;
-	char pseudo[MAX_CHAR]="";
+void check_pseudo(T_Client client){//vérification de l'existence du pseudo
+    FILE fclient=NULL;
+    fclient=fopen(NOM_FICHIER,"r+");
+    int flag=0;
+    char pseudo[MAX_CHAR]="";
 
-	//on lit dans notre socket socket_client et on met le message dans messageRecu
-	//attente du pseudo du joueur
-	recevoir_message(client->socket_client,messageRecu);
-	printf("\t%s : Pseudo: %s\n", client->idClient, messageRecu);
+    //on lit dans notre socket socket_client et on met le message dans messageRecu
+    //attente du pseudo du joueur
+    recevoir_message(client->socket_client,messageRecu);
+    printf("\t%s : Pseudo: %s\n", client->idClient, messageRecu);
 
 
-	//LECTURE DANS LE FICHIER
-	if(fclient != NULL ){
-		while(fscanf(fclient,"%s",pseudo) != EOF){// On lit le fichier tant qu'on est pas arrivé en fin de fichier (EOF)
-			if(strcmp(messageRecu,pseudo) == 0){
-				flag=1;
-				break;
-			}
-		}
-		
-		if(flag == 0){
-			fprintf(fclient,"%s 0\n",messageRecu);
-			printf("\n\t%s est un nouveau joueur, fiche créée !\n",messageRecu);
+    //LECTURE DANS LE FICHIER
+    if(fclient != NULL ){
+        while(fscanf(fclient,"%s",pseudo) != EOF){// On lit le fichier tant qu'on est pas arrivé en fin de fichier (EOF)
+            if(strcmp(messageRecu,pseudo) == 0){
+                flag=1;
+                break;
+            }
+        }
 
-			strcpy(pseudo,messageRecu);
-		}
-		fclose(fclient);
-		
-		initialiser_string(message);
-		sprintf(message,"%s", pseudo);
-		envoyer_message(client->socket_client,message);
+        if(flag == 0){
+            printf("\n\t%s est un nouveau client, pseudo ajouté !\n",messageRecu);
+            strcpy(pseudo,messageRecu);
+        }
+        fclose(fclient);
 
-		strcpy(client->pseudo,pseudo);
-		
-	}
-	else{
-		printf("Impossible d'ouvrir le fichier %s",NOM_FICHIER);
-	}
+        initialiser_string(message);
+        sprintf(message,"%s", pseudo);
+        envoyer_message(client->socket_client,message);
+
+        strcpy(client->pseudo,pseudo);
+
+    }
+    else{
+        printf("Impossible d'ouvrir le fichier %s",NOM_FICHIER);
+    }
 }
+
 
 void serveur_multiple(T_Client *client, int socketClient, struct sockaddr_in clnt, int *pt_nb_client){
 	char messageRecu[MAX_BUFF]="";
-	pid_t pid;
-
-	pid=fork();
+	char msg[MAX_BUFF];
 
 	client=(T_Client*)malloc(sizeof(T_Client));
 	assert(client != NULL);
 
-	if(pid == 0){
+	
+	client->socket_client=socketClient;
+	client->sockaddr_client=clnt;
+	client->idClient=inet_ntoa((client->sockaddr_client).sin_addr);
 		
-
-		client->socket_client=socketClient;
-		client->sockaddr_client=clnt;
-		client->idClient=inet_ntoa((client->sockaddr_client).sin_addr);
+	check_pseudo(client);
 		
-		check_pseudo(client);
-		
-
-		do{
+	for (int i = 0; i < NBCLIENT; i++)
+	{
+		//création threads serveur
+		CHECK(pthread_create (&tidSrv[i], NULL, ThreadDialogue, socketEcoute[i]),
+                "pthread_create()");
+		while(1)
+		{ 
 			recevoir_message(client->socket_client,messageRecu);
-			printf("recus: %s \n", messageRecu);
-			if(!atoi(messageRecu) == 0){ //si non stop
-				envoyer_message(client->socket_client,messageRecu);
+			parse_message(msg,messageRecu,"-",0);
+			if (comparer(messageRecu, "STOP") == 0)
+			{//si non stop
+				break;
 			}
-		}while(atoi(messageRecu) != 0);
 
-		close(client->socket_client);
+			envoyer_message(client->socket_client,messageRecu);
+			printf("recus: %s \n", messageRecu);
 		
-		exit(EXIT_SUCCESS);
+		}
+
+		printf("fin de l'écoute");
+		close(client->socket_client);
 	}
+	
+		
+	exit(EXIT_SUCCESS);
 }
+
+void * ()
 
 int start_server(const int port) {
 	int socket_server=-1;
@@ -253,7 +265,7 @@ int tailleChaine(const char chaine[])
 
 void envoyer_message(int socket, char *message) {
 	CHECK(send(socket, message, strlen(message)+1, 0), "echangeCS.c -> Erreur send");
-	printf("envoie message\n");
+	printf("envoie message: %s\n", message);
 }
 
 void recevoir_message(int socket, char *buffer) {
@@ -263,32 +275,53 @@ void recevoir_message(int socket, char *buffer) {
 	printf("reception message %s\n", buffer);
 }
 
-void bienvenue(int socket_client){
-	char pseudo[MAX_BUFF];
+void ecrireFichierEnregistrement(char * pseudo, char * IpClient, int PortClient)
+{
+    FILE* fichier = NULL;
+    fichier = fopen(NOM_FICHIER,"a");// test creer fic sinon r+
 
-	initialiser_message();
-	printf("\n\n\t\tBienvenue sur le tchat, écrivez votre pseudo: ");
-	scanf("%s",message);
-	
-	//envoi du pseudo
-	envoyer_message(socket_client,message);
+    if ( fichier != NULL)
+    {
+        // on lit et on écrit dans le fichier
+        fseek(fichier, 0, SEEK_END);
+        fprintf(fichier, "%s:%s:%d\n", pseudo, IpClient,PortClient);
+        rewind(fichier);
+        fclose(fichier);// on ferme le fichier qui a été ouvert
+    }
+    else
+    {
+        printf("Impossible d'ouvrir le fichier %s \n",NOM_FICHIER);
+    }
+}
 
-	//bienvenue de la part du serveur avec le nombre de points totalisé
-	recevoir_message(socket_client,messageRecu);
-	parse_message(pseudo,messageRecu,"-",0);
+void bienvenue(int socket_client, char **arguments){
+    char pseudo[MAX_BUFF];
 
-	printf("\n\t\tBonjour %s, vous avez %s en pseudo !\n", pseudo,pseudo);
+    inialiser_message();
+    printf("\n\n\t\tBienvenue sur le tchat, écrivez votre pseudo: ");
+    scanf("%s",message);
 
+    //envoi du pseudo
+    envoyer_message(socket_client,message);
+
+    //bienvenue de la part du serveur avec le nombre de points totalisé
+    recevoir_message(socket_client,messageRecu);
+    parse_message(pseudo,messageRecu,"-",0);
+
+    printf("\n\t\tBonjour %s, vous avez %s en pseudo !\n", pseudo,pseudo);
+
+    ecrireFichierEnregistrement(pseudo,arguments[2],atoi(arguments[1]));
 }
 
 void threadEnvoi( void* socket_clientV){
+	printf("début thread envoie\n");
 	int socket_client = *((int*) socket_clientV);
 	char msg[MAX_BUFF];
 	while(1){
 		initialiser_message();
 		// lecture message tapé par le client
 		scanf("%s",message);
-		parse_message(msg,messageRecu,"-",0);
+		parse_message(msg,message,"-",0);
 		if (comparer(msg,"STOP") == 0){
 			envoyer_message(socket_client, msg);
 			break;
@@ -296,16 +329,17 @@ void threadEnvoi( void* socket_clientV){
 		if (msg != NULL){
 			// envoi du message
 			envoyer_message(socket_client, msg);
-			printf("message envoyé");
 		}	
 	}
 	printf("déconnection\n");
 }
 
 void threadReception( void* socket_clientV){
+	printf("debut thread récéption\n");
 	int socket_client = *((int*) socket_clientV);
 	char msg[MAX_BUFF];
-	while(atoi(messageRecu) != 0){
+	char messageRecu[MAX_BUFF];
+	while(1){
 		// lecture message envoyé par le serveur
 		recevoir_message(socket_client,messageRecu);
 		parse_message(msg,messageRecu,"-",0);
@@ -325,14 +359,13 @@ void dialogue(int socket_client){
 	//thread d'envoi des messages
 	CHECK(pthread_create(&tidClt[0], NULL, (pf_t) threadEnvoi, (void *) &socket_client),
                 "pthread_create() threadEnvoi");
-	CHECK(pthread_join (tidClt[0], NULL),"pthread_join()");
 
 	//thread d affichage des messages			
 	CHECK(pthread_create(&tidClt[1], NULL, (pf_t) threadReception, (void *) &socket_client),
                 "pthread_create() threadReception");
 	
 	//attente de la fin des threads
-	
+	CHECK(pthread_join (tidClt[0], NULL),"pthread_join()");
 	CHECK(pthread_join (tidClt[1], NULL),"pthread_join()");
 }
 
@@ -349,7 +382,7 @@ int socket_client;
 		//Le client se connecte sur un port
 		socket_client=connexion(argv);
 
-		bienvenue(socket_client);
+		bienvenue(socket_client,argv);
 		dialogue(socket_client);
 		printf("end\n");
 	}
@@ -358,7 +391,7 @@ int socket_client;
 #endif
 
 #ifdef SERVEUR
-int s,clntLen,newsock;
+	int s,clntLen,newsock;
 	struct sockaddr_in clnt;
 	T_Client *client=NULL;
 	int nb_client=0;
