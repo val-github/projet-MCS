@@ -41,15 +41,18 @@ void envoyer_message(int socket, char *message);
 int tailleChaine(const char chaine[]);
 int comparer(const char chaine1[], const char chaine2[]);
 int parse_message(char *buffer,const char *str, const char *delim, int position);
+int start_server(const int port, const char * addr);
 
 
 
 typedef struct
 {
 	char *idClient;
-	char pseudo[MAX_CHAR];
+	char *pseudo;
 	int socket_client;
 	struct sockaddr_in sockaddr_client;
+	char * IPclient;
+	char * portClient;
 }T_Client;
 
 typedef struct
@@ -120,6 +123,67 @@ void check_pseudo(T_Client *client){//vérification de l'existence du pseudo
 	}
 }
 
+void lireEnregistrement(T_Client *clt,int nbLigne)
+{
+	char caractereActuel;
+	char chaine [MAX_CHAR],str[MAX_CHAR];
+	int c,ligne =0;
+	int compteur = 0;
+	FILE* fichier = NULL;
+	fichier = fopen(NOM_FICHIER,"r");
+    
+	if (fichier != NULL)
+	{
+		while (!feof(fichier))
+		{
+			fgetc(fichier);
+			compteur ++;
+		}
+		compteur = compteur - 1;
+		printf("compteur %d \n",compteur);		
+		fclose(fichier);// on ferme le fichier qui a été ouvert
+	}
+	else
+	{
+		printf("Impossible d'ouvrir le fichier %s \n",NOM_FICHIER);
+	}
+	FILE* fic = NULL;
+	fic = fopen(NOM_FICHIER,"r");
+
+	if (fic != NULL)
+	{
+		while((c=fgetc(fichier)) != EOF)
+		{
+			if(c=='\n')
+				ligne++;
+			if (ligne == nbLigne)// nb ligne choisit
+			{
+				fgets(chaine,compteur,fic);
+				printf("fgets %s \n",chaine);
+				clt->pseudo = strtok(chaine,":");
+				printf("%s\n", clt->pseudo);
+				if (clt->pseudo != NULL)
+				{
+					clt->IPclient = strtok(NULL,":");
+					printf("%s\n", clt->IPclient);
+	
+					if (clt->pseudo != NULL)
+					{
+						clt->portClient = strtok(NULL,":");
+						printf("%s\n", clt->portClient );
+					}
+				}
+				else
+				{
+					printf("erreur Decoupage");
+				}
+				//ajouté afin que la fonction s'arrete dés qu elle a lut la ligne souhaitée
+				break; 
+			}
+		}	
+ 	fclose(fic);
+	} 
+}
 
 void * serveur_multiple(void* argvoid){
 	T_arg arg = * ((T_arg*)argvoid);
@@ -146,19 +210,77 @@ void * serveur_multiple(void* argvoid){
 	//check_pseudo(client);
 		
 	
-		while(1)
-		{ 
-			recevoir_message(client->socket_client,messageRecu);
-			parse_message(msg,messageRecu,"-",0);
-			if (comparer(messageRecu, "STOP") == 0)
-			{//si non stop
-				break;
-			}
-
-			envoyer_message(client->socket_client,messageRecu);
-			printf("recus: %s \n", messageRecu);
-		
+	while(1)
+	{ 
+		recevoir_message(client->socket_client,messageRecu);
+		parse_message(msg,messageRecu,"-",0);
+		if (comparer(messageRecu, "STOP") == 0)
+		{//si non stop
+			break;
 		}
+		printf("recus: %s \n", messageRecu);
+		//envoyer_message(client->socket_client,messageRecu);
+
+		//envoir du message à tout les clients
+		int compteur = 0;
+		FILE* fichier = NULL;
+		fichier = fopen(NOM_FICHIER,"r");
+		int clntLen,newsock,s,c;
+		struct sockaddr_in clnt1;
+		clntLen = sizeof(clnt1);
+
+		if (fichier != NULL)
+		{
+			while ((c = fgetc(fichier)) != EOF)
+			{
+				if (c == "\n"){
+					compteur ++;
+				}
+			}
+			printf("compteur %d \n",compteur);	
+			compteur = compteur - 1;	
+			fclose(fichier);// on ferme le fichier qui a été ouvert
+		}
+		
+		for (int i=0; i<compteur; i++)
+		{
+			T_Client *cl;
+			//on récupére les informations des clients pour leur transmettre le message
+			printf("lecture fichier");
+			lireEnregistrement(cl, i);
+
+			char *ip;
+			int port;
+			port = atoi(cl->portClient);
+			ip = cl->IPclient;
+			//création socket de dialogue
+			s=start_server(port, ip);
+
+			//int sad;
+			//struct sockaddr_in srvAdr;
+
+			// Création d’une socket INET/STREAM d'appel et de dialogue
+			//printf("création socket");
+			/*
+			CHECK(sad = socket(PF_INET, SOCK_STREAM, 0),"-- PB : socket()");
+		
+			//adressage de la socket
+			srvAdr.sin_family = PF_INET;
+			srvAdr.sin_port = htons(port);		
+			srvAdr.sin_addr.s_addr = inet_addr(ip);
+			memset(&(srvAdr.sin_zero), 0, 8);*/
+
+			// demande connexion 
+			printf("connection");
+			
+			CHECK(newsock = accept(s, (struct sockaddr*)&clnt1, (socklen_t*)&clntLen), "PB -- accept()");
+			envoyer_message(newsock,messageRecu);
+			printf ("message envoyé a %s", cl->pseudo);
+			close(s);
+		}
+		
+		
+	}
 
 		printf("fin de l'écoute");
 		close(client->socket_client);
@@ -168,7 +290,7 @@ void * serveur_multiple(void* argvoid){
 }
 
 
-int start_server(const int port) {
+int start_server(const int port, const char * addr) {
 	int socket_server=-1;
 	struct sockaddr_in serv;
 
@@ -181,8 +303,12 @@ int start_server(const int port) {
 		return -1;
 	}
 	serv.sin_port = htons(port); 		//num port serveur à assigner manuellement
-
-	serv.sin_addr.s_addr = INADDR_ANY; 	//toutes les interfaces IP de la machine
+	if (comparer(addr, "") == 0){
+		serv.sin_addr.s_addr = INADDR_ANY; 	//toutes les interfaces IP de la machine
+	}else{
+		serv.sin_addr.s_addr = inet_addr(addr);
+	}
+	
 	
 	CHECK(bind(socket_server, (struct sockaddr*)&serv, sizeof(serv)), "PB -- bind()");
 	memset(&serv.sin_zero, 0, 8);
@@ -413,7 +539,7 @@ int socket_client;
 	}
 	else{
 		port=atoi(argv[1]);
-		s=start_server(port);
+		s=start_server(port, "");
 
 		printf("\n\t\t** tchat ouvert! **\n\n");
 
