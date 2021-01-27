@@ -160,8 +160,8 @@ void lireEnregistrement(T_Client *clt,int nbLigne)
 			{
 				fgets(chaine,compteur,fic);
 				printf("fgets %s \n",chaine);
-				clt->pseudo = strtok(chaine,":");
-				printf("%s\n", clt->pseudo);
+				//clt->pseudo = strtok(chaine,":");
+				//printf("%s\n", clt->pseudo);
 				if (clt->pseudo != NULL)
 				{
 					clt->IPclient = strtok(NULL,":");
@@ -208,7 +208,9 @@ void * serveur_multiple(void* argvoid){
 	client->idClient=inet_ntoa((client->sockaddr_client).sin_addr);
 		
 	//check_pseudo(client);
-		
+	recevoir_message(client->socket_client,messageRecu);
+	parse_message(msg,messageRecu,"-",0);
+	envoyer_message(client->socket_client,messageRecu);
 	
 	while(1)
 	{ 
@@ -244,46 +246,28 @@ void * serveur_multiple(void* argvoid){
 			fclose(fichier);// on ferme le fichier qui a été ouvert
 		}*/
 		int clntLen,newsock,s;
-	struct sockaddr_in clnt1;
-	clntLen = sizeof(clnt1);
-	int compteur = 0;
-	int c,ligne=0;
-	FILE* fichier = NULL;
-	fichier = fopen(NOM_FICHIER,"r");
-    
-	if (fichier != NULL)
-	{
-		while (!feof(fichier))
-		{
-			fgetc(fichier);
-			compteur ++;
-		}
-		compteur = compteur - 1;
-		printf("compteur %d \n",compteur);		
-		fclose(fichier);// on ferme le fichier qui a été ouvert
-	}
-	else
-	{
-		printf("Impossible d'ouvrir le fichier %s \n",NOM_FICHIER);
-	}
-	FILE* fic = NULL;
-	fic = fopen(NOM_FICHIER,"r");
+		struct sockaddr_in clnt1;
+		clntLen = sizeof(clnt1);
+		int compteur = 0;
+		int c,ligne=0;
+		FILE* fichier = NULL;
+		fichier = fopen(NOM_FICHIER,"r");
 
-	if (fic != NULL)
-	{
-		while((c=fgetc(fichier)) != EOF)
+		if (fichier != NULL)
 		{
-			if(c=='\n')
-				ligne++;
-		}
-		printf("LIGNE %d \n",ligne);	
-	fclose(fic);	
-	}	
+			while((c=fgetc(fichier)) != EOF)
+			{
+				if(c=='\n')
+					ligne++;
+			}
+			printf("LIGNE %d \n",ligne);	
+			fclose(fichier);	
+		}	
 		for (int i=0; i<ligne; i++)
 		{
 			T_Client *cl;
 			//on récupére les informations des clients pour leur transmettre le message
-			printf("lecture fichier");
+			printf("lecture fichier\n");
 			lireEnregistrement(cl, i);
 
 			char *ip;
