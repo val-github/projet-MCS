@@ -37,22 +37,19 @@ pthread_t tidSrv[NBCLIENT];
 pthread_t tidClt[2];
 
 void recevoir_message(int socket, char *buffer);
-void envoyer_message(int socket, char *message);
+void envoyer_message(char * pseudo,int socket, char *message);/////////////////////////////////////////////////////////////////////////////////////////////////////
 int tailleChaine(const char chaine[]);
 int comparer(const char chaine1[], const char chaine2[]);
 int parse_message(char *buffer,const char *str, const char *delim, int position);
-int start_server(const int port, const char * addr);
 
 
 
 typedef struct
 {
-	char *idClient;
-	char *pseudo;
+	char * idClient;
+	char * pseudo;
 	int socket_client;
 	struct sockaddr_in sockaddr_client;
-	char * IPclient;
-	char * portClient;
 }T_Client;
 
 typedef struct
@@ -61,8 +58,6 @@ typedef struct
 	int socket_client;
 	struct sockaddr_in clnt;
 }T_arg;
-
-T_Client T_Ens_Player[MAX_CHAR];
 
 typedef void * (*pf_t) (void *);
 
@@ -82,11 +77,24 @@ void viderBuffer()
     } 
 }
 
-void check_pseudo(T_Client *client){//vérification de l'existence du pseudo
+void envoyer_message(char * pseudo, int socket, char *message) {///////////////////////////////////////////////////////////////////////////////////// à besoin de pseudo
+	if(pseudo == NULL)
+		pseudo="SERVEUR";	
+	CHECK(send(socket, message, strlen(message)+1, 0), "--PB send()");
+	printf("\n [%s] à envoyer: %s\n",pseudo, message);
+}
+
+void recevoir_message(int socket, char *buffer) {
+	memset(buffer, 0, MAX_BUFF);
+	CHECK(read(socket, buffer, MAX_BUFF), "--PB read()");
+	printf("\nreception message %s\n", buffer);
+}
+
+void check_pseudo(T_Client *client, char * pseudo){//pb coredump
 	FILE* fclient=NULL;
 	fclient=fopen(NOM_FICHIER,"r+");
 	int flag=0;
-	char pseudo[MAX_CHAR]="";
+	//char pseudo[MAX_CHAR]="";
 
 	//on lit dans notre socket socket_client et on met le message dans messageRecu
 	//attente du pseudo du joueur
@@ -104,18 +112,17 @@ void check_pseudo(T_Client *client){//vérification de l'existence du pseudo
 		}
 		
 		if(flag == 0){
-			//fprintf(fclient,"%s 0\n",messageRecu);
 			printf("\n\t%s est un nouveau client, pseudo créée !\n",messageRecu);
 
 			strcpy(pseudo,messageRecu);
 		}
 		fclose(fclient);
-		
+	
 		initialiser_string(message);
 		sprintf(message,"%s", pseudo);
-		envoyer_message(client->socket_client,message);
+		envoyer_message(messageRecu,client->socket_client,message);
 
-		strcpy(client->pseudo,pseudo);
+
 		
 	}
 	else{
@@ -123,70 +130,10 @@ void check_pseudo(T_Client *client){//vérification de l'existence du pseudo
 	}
 }
 
-void lireEnregistrement(T_Client *clt,int nbLigne)
-{
-	char caractereActuel;
-	char chaine [MAX_CHAR],str[MAX_CHAR];
-	int c,ligne =0;
-	int compteur = 0;
-	FILE* fichier = NULL;
-	fichier = fopen(NOM_FICHIER,"r");
-    
-	if (fichier != NULL)
-	{
-		while (!feof(fichier))
-		{
-			fgetc(fichier);
-			compteur ++;
-		}
-		compteur = compteur - 1;
-		printf("compteur %d \n",compteur);		
-		fclose(fichier);// on ferme le fichier qui a été ouvert
-	}
-	else
-	{
-		printf("Impossible d'ouvrir le fichier %s \n",NOM_FICHIER);
-	}
-	FILE* fic = NULL;
-	fic = fopen(NOM_FICHIER,"r");
-
-	if (fic != NULL)
-	{
-		while((c=fgetc(fichier)) != EOF)
-		{
-			if(c=='\n')
-				ligne++;
-			if (ligne == nbLigne)// nb ligne choisit
-			{
-				fgets(chaine,compteur,fic);
-				printf("fgets %s \n",chaine);
-				clt->pseudo = strtok(chaine,":");
-				printf("%s\n", clt->pseudo);
-				if (clt->pseudo != NULL)
-				{
-					clt->IPclient = strtok(NULL,":");
-					printf("%s\n", clt->IPclient);
-	
-					if (clt->pseudo != NULL)
-					{
-						clt->portClient = strtok(NULL,":");
-						printf("%s\n", clt->portClient );
-					}
-				}
-				else
-				{
-					printf("erreur Decoupage");
-				}
-				//ajouté afin que la fonction s'arrete dés qu elle a lut la ligne souhaitée
-				break; 
-			}
-		}	
- 	fclose(fic);
-	} 
-}
 
 void * serveur_multiple(void* argvoid){
 	T_arg arg = * ((T_arg*)argvoid);
+	
 	
 	T_Client *client;
 	int socketClient;
@@ -207,118 +154,21 @@ void * serveur_multiple(void* argvoid){
 	client->sockaddr_client=clnt;
 	client->idClient=inet_ntoa((client->sockaddr_client).sin_addr);
 		
-	//check_pseudo(client);
-		
-	
-	while(1)
-	{ 
-		recevoir_message(client->socket_client,messageRecu);
-		parse_message(msg,messageRecu,"-",0);
-		if (comparer(messageRecu, "STOP") == 0)
-		{//si non stop
-			break;
-		}
-		printf("recus: %s \n", messageRecu);
-		//envoyer_message(client->socket_client,messageRecu);
+	char pseudo[MAX_CHAR]="";
+	check_pseudo(client,pseudo);
 
-		//envoir du message à tout les clients
-		/*int compteur = 0;
-		FILE* fichier = NULL;
-		fichier = fopen(NOM_FICHIER,"r");
-		int clntLen,newsock,s;
-		char c;
-		struct sockaddr_in clnt1;
-		clntLen = sizeof(clnt1);
-
-		if (fichier != NULL)
-		{
-			while ((c = fgetc(fichier)) != EOF)
-			{
-				if (c == "\n"){
-					compteur ++;
-				}
+		while(1)
+		{ 
+			recevoir_message(client->socket_client,messageRecu);
+			parse_message(msg,messageRecu,"-",0);
+			if (comparer(messageRecu, "STOP") == 0)
+			{//si non stop
+				break;
 			}
-
-			compteur = compteur - 1;
-			printf("compteur %d \n",compteur);	
-			fclose(fichier);// on ferme le fichier qui a été ouvert
-		}*/
-		int clntLen,newsock,s;
-	struct sockaddr_in clnt1;
-	clntLen = sizeof(clnt1);
-	int compteur = 0;
-	int c,ligne=0;
-	FILE* fichier = NULL;
-	fichier = fopen(NOM_FICHIER,"r");
-    
-	if (fichier != NULL)
-	{
-		while (!feof(fichier))
-		{
-			fgetc(fichier);
-			compteur ++;
-		}
-		compteur = compteur - 1;
-		printf("compteur %d \n",compteur);		
-		fclose(fichier);// on ferme le fichier qui a été ouvert
-	}
-	else
-	{
-		printf("Impossible d'ouvrir le fichier %s \n",NOM_FICHIER);
-	}
-	FILE* fic = NULL;
-	fic = fopen(NOM_FICHIER,"r");
-
-	if (fic != NULL)
-	{
-		while((c=fgetc(fichier)) != EOF)
-		{
-			if(c=='\n')
-				ligne++;
-		}
-		printf("LIGNE %d \n",ligne);	
-	fclose(fic);	
-	}	
-		for (int i=0; i<ligne; i++)
-		{
-			T_Client *cl;
-			//on récupére les informations des clients pour leur transmettre le message
-			printf("lecture fichier");
-			lireEnregistrement(cl, i);
-
-			char *ip;
-			int port;
-			port = atoi(cl->portClient);
-			ip = cl->IPclient;
-			//création socket de dialogue
-			s=start_server(port, ip);
-
-			//int sad;
-			//struct sockaddr_in srvAdr;
-
-			// Création d’une socket INET/STREAM d'appel et de dialogue
-			//printf("création socket");
-			/*
-			CHECK(sad = socket(PF_INET, SOCK_STREAM, 0),"-- PB : socket()");
+			envoyer_message(pseudo,client->socket_client,messageRecu);//////////////////////////////////////////////////////////////////////////////////////////////////////
+			printf("reçus: %s \n", messageRecu);
 		
-			//adressage de la socket
-			srvAdr.sin_family = PF_INET;
-			srvAdr.sin_port = htons(port);		
-			srvAdr.sin_addr.s_addr = inet_addr(ip);
-			memset(&(srvAdr.sin_zero), 0, 8);*/
-
-			// demande connexion 
-			printf("connection");
-			
-
-			CHECK(newsock = accept(s, (struct sockaddr*)&clnt1, (socklen_t*)&clntLen), "PB -- accept()");
-			envoyer_message(newsock,messageRecu);
-			printf ("message envoyé a %s", cl->pseudo);
-			close(s);
 		}
-		
-		
-	}
 
 		printf("fin de l'écoute");
 		close(client->socket_client);
@@ -328,7 +178,7 @@ void * serveur_multiple(void* argvoid){
 }
 
 
-int start_server(const int port, const char * addr) {
+int start_server(const int port) {
 	int socket_server=-1;
 	struct sockaddr_in serv;
 
@@ -341,12 +191,8 @@ int start_server(const int port, const char * addr) {
 		return -1;
 	}
 	serv.sin_port = htons(port); 		//num port serveur à assigner manuellement
-	if (comparer(addr, "") == 0){
-		serv.sin_addr.s_addr = INADDR_ANY; 	//toutes les interfaces IP de la machine
-	}else{
-		serv.sin_addr.s_addr = inet_addr(addr);
-	}
-	
+
+	serv.sin_addr.s_addr = INADDR_ANY; 	//toutes les interfaces IP de la machine
 	
 	CHECK(bind(socket_server, (struct sockaddr*)&serv, sizeof(serv)), "PB -- bind()");
 	memset(&serv.sin_zero, 0, 8);
@@ -442,18 +288,6 @@ int tailleChaine(const char chaine[])
     return i;
 }
 
-void envoyer_message(int socket, char *message) {
-	CHECK(send(socket, message, strlen(message)+1, 0), "echangeCS.c -> Erreur send");
-	printf("envoie message: %s\n", message);
-}
-
-void recevoir_message(int socket, char *buffer) {
-	//strcpy(buffer,"");
-	memset(buffer, 0, MAX_BUFF);
-	CHECK(read(socket, buffer, MAX_BUFF), "echangeCS.c -> Erreur read");
-	printf("reception message %s\n", buffer);
-}
-
 void ecrireFichierEnregistrement(char * pseudo, char * IpClient, int PortClient)
 {
     FILE* fichier = NULL;
@@ -481,7 +315,7 @@ void bienvenue(int socket_client, char **arguments){
     scanf("%s",message);
 
     //envoi du pseudo
-    envoyer_message(socket_client,message);
+    envoyer_message("NULL",socket_client,message);///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     //bienvenue de la part du serveur avec le nombre de points totalisé
     recevoir_message(socket_client,messageRecu);
@@ -502,12 +336,12 @@ void threadEnvoi( void* socket_clientV){
 		scanf("%s",message);
 		parse_message(msg,message,"-",0);
 		if (comparer(msg,"STOP") == 0){
-			envoyer_message(socket_client, msg);
+			envoyer_message("NULL",socket_client, msg);////////////////////////////////////////////////////////////////////////////////////////////////////////
 			break;
 		}
 		if (msg != NULL){
 			// envoi du message
-			envoyer_message(socket_client, msg);
+			envoyer_message(NULL,socket_client, msg);///////////////////////////////////////////////////////////////////////////////////////////////////////
 		}	
 	}
 	printf("déconnection\n");
@@ -528,7 +362,7 @@ void threadReception( void* socket_clientV){
 			break;
 		}
 		//affichage message
-		printf("recu: %s", msg);
+		//printf("recu: %s", msg);
 	}
 }
 
@@ -577,7 +411,7 @@ int socket_client;
 	}
 	else{
 		port=atoi(argv[1]);
-		s=start_server(port, "");
+		s=start_server(port);
 
 		printf("\n\t\t** tchat ouvert! **\n\n");
 
@@ -599,14 +433,13 @@ int socket_client;
 			CHECK(pthread_create (&tidSrv[i], NULL, serveur_multiple, (void *) &arg),
                 	"pthread_create()");
 			printf("thread lancé\n");
-			
+			//serveur_multiple(client,newsock,clnt);
 		}
 		
 		for (int i = 0; i < NBCLIENT; i++)
 		{
 			CHECK(pthread_join (tidSrv[i], NULL),"pthread_join()");
 		}
-		//serveur_multiple(client,newsock,clnt);
 		//close(s);
 	}
 #endif
